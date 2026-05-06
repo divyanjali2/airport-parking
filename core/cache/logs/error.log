@@ -1,0 +1,2 @@
+[2026-04-24 09:02:36] (ERROR @ C:\xampp\htdocs\airport\core\src\Revolution\modX.php : 1085) `FORGOT_PAGE_ID` is not a valid integer and may not be passed to makeUrl()
+[2026-04-24 09:02:36] (ERROR in resource 6 @ C:\xampp\htdocs\airport\core\src\Revolution\modLinkTag.php : 108) Bad link tag `[[~FORGOT_PAGE_ID]]` encountered

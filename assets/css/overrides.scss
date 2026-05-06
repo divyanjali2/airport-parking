@@ -1,0 +1,50 @@
+@import 'variables';
+
+* {
+    font-family: $font-secondary;
+}
+
+.active::after {
+    content: '';
+    display: block;
+    border-bottom: 2px solid $color-primary;
+}
+
+.form-check-input:checked {
+    background-color: $color-primary !important;
+}
+
+form {
+    .form-control {
+        border: 0;
+        border-bottom: 1px solid #8D8D8D;
+        font-size: 15px;
+        border-radius: 0;
+            
+        &:focus {
+            box-shadow: none;
+        }
+
+        &::placeholder {
+            color: #999;
+        }
+
+        &:not(textarea) {
+            border-radius: 0;
+        }
+
+        &:is(textarea) {
+            border-radius: 4px;
+            border: 1px solid #8D8D8D;
+        }
+    }
+
+    input[type="submit"] {
+        border: 2px solid $color-primary;
+        background: $color-primary;
+        padding: 5px 10px;
+        text-decoration: none;
+        text-transform: uppercase;
+        color: $color-white;
+    }
+}
