@@ -58,6 +58,20 @@ function toDatetimeLocal($dt) {
     if (!$ts) return '';
     return date('Y-m-d\TH:i', $ts);
 }
+
+$canGenerateReceiptTime = false;
+
+if (!empty($b['end_date'])) {
+
+    $endTimestamp = strtotime($b['end_date']);
+    $nowTimestamp = time();
+
+    $before24Hours = $endTimestamp - (24 * 60 * 60);
+
+    if ($nowTimestamp >= $before24Hours) {
+        $canGenerateReceiptTime = true;
+    }
+}
 ?>
 
 <div class="modal-header">
@@ -67,37 +81,32 @@ function toDatetimeLocal($dt) {
 
 <div class="modal-body">
     <div class="row g-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label fw-bold">Customer Name</label>
             <input type="text" class="form-control" value="<?= htmlspecialchars($b['name'] ?? '') ?>" readonly>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label fw-bold">Contact Number</label>
             <input type="text" class="form-control" value="<?= htmlspecialchars($b['whatsapp_number'] ?? '') ?>" readonly>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label fw-bold">Vehicle Number</label>
             <input type="text" class="form-control" value="<?= htmlspecialchars($b['vehicle_number'] ?? '') ?>" readonly>
         </div>
 
-        <div class="col-md-6">
-            <label class="form-label fw-bold">Parking Location</label>
-            <input type="text" class="form-control" value="<?= htmlspecialchars($b['slot_number'] ?? '') ?>" readonly>
-        </div>
-
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label fw-bold">Original Total Price (LKR)</label>
             <input type="text" class="form-control" value="<?= number_format($baseTotalPrice, 2, '.', '') ?>" readonly>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label fw-bold">Already Paid (LKR)</label>
             <input type="text" class="form-control" id="already_paid_amount" value="<?= number_format($totalPaidSoFar, 2, '.', '') ?>" readonly>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label fw-bold">New End Date/Time</label>
             <input
                 type="datetime-local"
@@ -115,7 +124,7 @@ function toDatetimeLocal($dt) {
             <?php endif; ?>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label fw-bold">Updated Total Price (LKR)</label>
             <input
                 type="text"
@@ -133,19 +142,20 @@ function toDatetimeLocal($dt) {
             </small>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
             <label class="form-label fw-bold">Balance to Collect (LKR)</label>
             <input type="text" class="form-control" id="receipt_balance_amount" readonly>
         </div>
 
-        <div class="col-md-6 d-flex align-items-end">
+        <div class="col-md-4 d-flex align-items-end">
             <div class="w-100">
                <button
                     type="button"
-                    class="btn btn-success w-100"
+                    class="btn <?= $canGenerateReceiptTime ? 'btn-success' : 'btn-secondary' ?> w-100"
                     id="confirmGenerateReceiptBtn"
+                    <?= $canGenerateReceiptTime ? '' : 'disabled' ?>
                 >
-                    Generate Payment Receipt
+                    <?= $canGenerateReceiptTime ? 'Generate Payment Receipt' : 'Available 24 Hours Before End Time' ?>
                 </button>
 
                 <small id="receiptStatusText" class="fw-bold mt-2 d-block <?= $lastReceipt ? 'text-success' : 'd-none' ?>">
@@ -165,6 +175,7 @@ function toDatetimeLocal($dt) {
 <script>
 (function () {
     const bookingId = <?= (int)$b['id'] ?>;
+    const canGenerateReceiptTime = <?= $canGenerateReceiptTime ? 'true' : 'false' ?>;
     const baseTotalPrice = <?= json_encode((float)$baseTotalPrice) ?>;
     let totalPaidSoFar = <?= json_encode((float)$totalPaidSoFar) ?>;
 
@@ -204,6 +215,16 @@ function toDatetimeLocal($dt) {
     }
 
     function checkForChanges() {
+        if (!canGenerateReceiptTime) {
+            $generateBtn
+                .prop('disabled', true)
+                .text('Available 24 Hours Before End Time')
+                .removeClass('btn-success')
+                .addClass('btn-secondary');
+
+            return;
+        }
+
         const currentEndDate = $editedEndDate.val();
         const currentPrice = normalizeAmount($updatedTotalPrice.val());
 

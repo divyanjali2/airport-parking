@@ -24,13 +24,12 @@ try {
             booking_type,
             whatsapp_number,
             total_price_final,
-            status
+            booking_status
         FROM reserved_slots
         WHERE is_trashed = 0
         AND is_no_show = 0
-        ORDER BY 
-            CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
-            created_at DESC
+        AND booking_status = 'pending'
+        ORDER BY created_at DESC
     ");
 
     $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -95,9 +94,7 @@ try {
             <div class="container-fluid">
                 <div class="card dashboard-card">
                     <div class="d-flex justify-content-end">
-                        <!-- <a href="add-invoices.php" class="btn btn-warning text-dark me-2">
-                            Add Invoices
-                        </a> -->
+                
                         <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#directBookingModal">
                             Add Direct Booking
                         </button>
@@ -137,13 +134,11 @@ try {
                                 <tr class="table-dark">
                                     <th>#</th>
                                     <th>Booking Type</th>
-                                    <!-- <th>Reference No</th> -->
                                     <th>Customer</th>
                                     <th>WhatsApp</th>
                                     <th>Date</th>
                                     <th>Total Price (LKR)</th>
                                     <th>Invoice</th>
-                                    <!-- <th>Status</th> -->
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -173,49 +168,26 @@ try {
                                             <?php else: ?>
                                                 N/A
                                             <?php endif; ?>
-                                        </td>
-                                        <!-- <?php
-                                            $status = strtolower($b['status']);
-
-                                            $badgeClass = match ($status) {
-                                                'pending' => 'bg-warning text-dark',
-                                                'send_to_finance' => 'bg-info text-dark',
-                                                'accepted' => 'bg-success text-white',
-                                                default => 'bg-secondary text-white'
-                                            };
-                                            ?>
-                                            <td>
-                                                <span class="badge <?= $badgeClass ?> p-2">
-                                                    <?= htmlspecialchars(ucwords(str_replace('_', ' ', $b['status']))) ?>
-                                                </span>
-                                            </td>                                        -->
+                                        </td>                                    
                                         <td class="d-flex gap-1">
-                                            <!-- <button
-                                                class="btn btn-sm btn-outline-primary payment-receipt-btn"
+                                            <button 
+                                                type="button" 
+                                                class="btn btn-sm btn-success confirm-booking-btn"
                                                 data-id="<?= $b['id'] ?>"
-                                            >
-                                                Receipt
-                                            </button> -->
+                                                data-reference="<?= htmlspecialchars($b['reference_number']) ?>"
+                                                title="Confirm Booking">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
 
-                                            <!-- Edit button -->
-                                            <!-- <button class="btn btn-sm btn-outline-success edit-booking" data-id="<?= $b['id'] ?>">Edit</button> -->
-
-                                            <button type="button" class="btn btn-sm btn-danger no-show-btn" data-id="<?= $b['id'] ?>" data-reference="<?= htmlspecialchars($b['reference_number']) ?>" title="Mark as No Show" >
+                                            <button 
+                                                type="button" 
+                                                class="btn btn-sm btn-danger no-show-btn" 
+                                                data-id="<?= $b['id'] ?>" 
+                                                data-reference="<?= htmlspecialchars($b['reference_number']) ?>" 
+                                                title="Mark as No Show">
                                                 <i class="bi bi-person-x"></i>
                                             </button>
 
-                                            <!-- <?php if (!empty($b['whatsapp_number']) && !empty($b['pdf_path'])): 
-                                                $waNumber = preg_replace('/\D+/', '', $b['whatsapp_number']);
-                                                $pdfPath = '/' . ltrim(str_replace('\\', '/', str_replace($_SERVER['DOCUMENT_ROOT'], '', $b['pdf_path'])), '/');
-                                                $pdfUrl  = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://{$_SERVER['HTTP_HOST']}$pdfPath";
-                                                $waLink  = "https://wa.me/{$waNumber}?text=" . urlencode(
-                                                    "Hello {$b['customer_name']}, this is your booking invoice from Airport Parking. Your reference number is {$b['reference_number']}. View your invoice here: {$pdfUrl}"
-                                                );
-                                            ?>
-                                                <a href="<?= $waLink ?>" target="_blank" class="btn btn-sm btn-outline-success">
-                                                    <i class="bi bi-whatsapp"></i>
-                                                </a> -->
-                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -437,18 +409,44 @@ try {
                 </div>
             </div>
 
-            <div class="modal fade" id="editBookingModal" tabindex="-1">
-                <div class="modal-dialog modal-xl">
-                    <div class="modal-content" id="editBookingContent">
-                        <!-- Loaded via AJAX -->
-                    </div>
-                </div>
-            </div>
+            <div class="modal fade" id="confirmBookingModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
 
-            <div class="modal fade" id="paymentReceiptModal" tabindex="-1">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content" id="paymentReceiptContent">
-                        <!-- Loaded via AJAX -->
+                        <form id="confirmBookingForm">
+
+                            <div class="modal-header">
+                                <h5 class="modal-title">Confirm Booking</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+
+                            <div class="modal-body">
+
+                                <input type="hidden" id="confirm_booking_id">
+
+                                <p>
+                                    Are you sure you want to confirm this booking?
+                                </p>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Reference No</label>
+                                    <input type="text" id="confirm_reference" class="form-control" readonly>
+                                </div>
+
+                            </div>
+
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    Cancel
+                                </button>
+
+                                <button type="submit" class="btn btn-success">
+                                    Yes, Confirm
+                                </button>
+                            </div>
+
+                        </form>
+
                     </div>
                 </div>
             </div>
@@ -481,6 +479,54 @@ try {
             }
 
             setMinDateTime();
+        });
+    </script>
+
+    <script>
+        $(document).on('click', '.confirm-booking-btn', function () {
+
+            $('#confirm_booking_id').val($(this).data('id'));
+            $('#confirm_reference').val($(this).data('reference'));
+
+            bootstrap.Modal.getOrCreateInstance(
+                document.getElementById('confirmBookingModal')
+            ).show();
+        });
+
+        $(document).on('submit', '#confirmBookingForm', function (e) {
+
+            e.preventDefault();
+
+            const id = $('#confirm_booking_id').val();
+
+            $.ajax({
+                url: 'assets/includes/confirm-booking.php',
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    id: id
+                },
+
+                success: function (res) {
+
+                    if (res.success) {
+
+                        bootstrap.Modal.getInstance(
+                            document.getElementById('confirmBookingModal')
+                        ).hide();
+
+                        location.reload();
+
+                    } else {
+                        alert(res.message || 'Failed to confirm booking.');
+                    }
+                },
+
+                error: function () {
+                    alert('Server error while confirming booking.');
+                }
+            });
+
         });
     </script>
 
@@ -617,238 +663,6 @@ try {
 
                     window.location.href = `balance-sheet.php?from=${encodeURIComponent(date)}`;
                 });
-            });
-        });
-    </script>
-
-    <script>
-        $(document).ready(function() {
-            function calculateTotal() {
-                const startVal = $('#start-date').val();
-                const endVal = $('#end-date').val();
-                if (!startVal || !endVal) {
-                    $('#calculated-price').text('');
-                    return 0;
-                }
-
-                const start = new Date(startVal);
-                const end = new Date(endVal);
-
-                if (end <= start) {
-                    $('#calculated-price').text('0');
-                    return 0;
-                }
-
-                // Difference in milliseconds
-                const diffMs = end - start;
-
-                // Fractional days
-                const daysFraction = diffMs / (1000 * 60 * 60 * 24); 
-
-                const daysWhole = Math.floor(daysFraction);
-                const hours = Math.round((daysFraction - daysWhole) * 24);
-                const displayDuration = `${daysWhole} days${hours > 0 ? ' ' + hours + ' hours' : ''}`;
-
-                // Price per day
-                const pricePerDay = 1000;
-
-                // Extras
-                let extrasTotal = 0;
-                $('.extra-service:checked').each(function() {
-                    extrasTotal += parseInt($(this).data('price')) || 0;
-                });
-
-                // Total price including fractional days
-                const totalPrice = Math.round(daysFraction * pricePerDay + extrasTotal);
-
-                $('#calculated-price').text(totalPrice.toLocaleString() + ' ( ' + displayDuration + ' )');
-
-                return totalPrice;
-            }
-
-            // Recalculate when inputs change
-            $('#start-date, #end-date, .extra-service').on('change', calculateTotal);
-
-            $('#direct-booking-form').on('submit', function(e) {
-                e.preventDefault();
-
-                const $saveBtn = $(this).find('button[type="submit"]');
-                $saveBtn.prop('disabled', true).text('Saving...');
-
-                const startVal = $('#start-date').val();
-                const endVal = $('#end-date').val();
-                if (!startVal || !endVal) {
-                    alert("Please select both start and end dates.");
-                    $saveBtn.prop('disabled', false).text('Save Booking');
-                    return;
-                }
-
-                const extras = $('.extra-service:checked').map(function(){ return this.value; }).get();
-                const daysFraction = (new Date(endVal) - new Date(startVal)) / (1000*60*60*24);
-                const totalPrice = calculateTotal(); 
-
-                const formData = new FormData();
-                formData.append('slot', $('#slot-number').val());
-                formData.append('vehicleType', $('#vehicle-type').val());
-                formData.append('flightNumber', $('#flight-number').val());
-                formData.append('vehicleNumber', $('#vehicle_number').val());
-                formData.append('startDate', startVal);
-                formData.append('endDate', endVal);
-                formData.append('name', $('#user-name').val());
-                formData.append('hometown', $('#hometown').val());
-                formData.append('receiver_name', $('#receiver_name').val());
-                formData.append('email', $('#user-email').val());
-                formData.append('whatsapp', $('#whatsapp-number').val());
-                formData.append('pricePerDay', 1000);
-                formData.append('days', daysFraction);
-                formData.append('passenger_count', $('#passenger_count').val());
-                formData.append('totalPrice', calculateTotal());
-                formData.append('remarks', '');
-                formData.append('receiverName', '');
-                formData.append('booking_type', 'direct booking');
-
-                // Append extras as array
-                extras.forEach(extra => formData.append('extras[]', extra));
-
-                // Append image files
-                const airTicketFile = $('#air_ticket_image_url')[0].files[0];
-                const passportFile = $('#passport_copy_image_url')[0].files[0];
-                if (airTicketFile) formData.append('air_ticket_image_url', airTicketFile);
-                if (passportFile) formData.append('passport_copy_image_url', passportFile);
-
-                $.ajax({
-                    url: 'assets/includes/save-booking.php',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,  
-                    contentType: false,  
-                    success: function(res) {
-                        if (res.success) {
-                            const modalEl = document.getElementById('directBookingModal');
-                            const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-                            modal.hide();
-
-                            setTimeout(function() {
-                                alert("Booking saved successfully: " + res.reference);
-                                location.reload();
-                            }, 200);
-                        } else {
-                            alert("Error: " + res.detail);
-                            $saveBtn.prop('disabled', false).text('Save Booking');
-                        }
-                    },
-                    error: function() {
-                        alert("Server error. Please try again.");
-                        $saveBtn.prop('disabled', false).text('Save Booking');
-                    }
-                });
-            });
-
-        });
-    </script>
-
-    <script>
-        $(document).on('click', '.edit-booking', function () {
-            const id = $(this).data('id');
-
-            $('#editBookingContent')
-                .load(`assets/includes/edit-booking-modal.php?id=${id}`, () => {
-                    bootstrap.Modal.getOrCreateInstance(
-                        document.getElementById('editBookingModal')
-                    ).show();
-                });
-        });
-
-        $(document).on('click', '#saveRemark', function (e) {
-            e.preventDefault();
-
-            const isTrashChecked = $('#move-to-trash').is(':checked');
-            const remark = $('#edit-remark').val().trim();
-            const meterReading = $('#meter_reading').val().trim();
-            const editedEndDate = $('#edited_end_date').val();
-            const files = $('#images')[0].files;
-
-            if (isTrashChecked && remark === '') {
-                alert('Staff Remarks are required when moving a booking to trash.');
-                $('#edit-remark').focus();
-                return;
-            }
-
-            if (!meterReading) {
-                alert('Meter reading is required.');
-                $('#meter_reading').focus();
-                return;
-            }
-
-            const hasExistingImages = <?= !empty($images) ? 'true' : 'false' ?>;
-            if (!files.length && !hasExistingImages) {
-                alert('Please upload booking images.');
-                $('#images').focus();
-                return;
-            }
-
-            const payload = {
-                id: $(this).data('id'),
-                remark: remark,
-                is_trashed: isTrashChecked ? 1 : 0,
-                meter_reading: meterReading,
-                edited_end_date: editedEndDate,
-                vehicle_status: 'completed',
-                images: []
-            };
-
-            if (!files.length) {
-                send(payload);
-                return;
-            }
-
-            Promise.all([...files].map(readBase64))
-                .then(images => {
-                    payload.images = images;
-                    send(payload);
-                });
-
-            function send(data) {
-                $.ajax({
-                    url: 'assets/includes/update-remark.php',
-                    type: 'POST',
-                    contentType: 'application/json',
-                    dataType: 'json',
-                    data: JSON.stringify(data),
-                    success(res) {
-                        if (res.success) {
-                            bootstrap.Modal
-                                .getInstance(document.getElementById('editBookingModal'))
-                                .hide();
-                            location.reload();
-                        } else {
-                            alert(res.message || 'Failed to save changes');
-                        }
-                    },
-                    error() {
-                        alert('Server error while saving changes');
-                    }
-                });
-            }
-
-            function readBase64(file) {
-                return new Promise(resolve => {
-                    const reader = new FileReader();
-                    reader.onload = e => resolve(e.target.result);
-                    reader.readAsDataURL(file);
-                });
-            }
-        });
-    </script>
-
-    <script>
-        $(document).on('click', '.payment-receipt-btn', function () {
-            const id = $(this).data('id');
-
-            $('#paymentReceiptContent').load(`assets/includes/payment-receipt-modal.php?id=${id}`, function () {
-                bootstrap.Modal.getOrCreateInstance(
-                    document.getElementById('paymentReceiptModal')
-                ).show();
             });
         });
     </script>

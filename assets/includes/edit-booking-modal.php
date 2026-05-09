@@ -18,7 +18,7 @@ $fields = [
     'name' => 'Customer',
     'email' => 'Email',
     'whatsapp_number' => 'WhatsApp',
-    'slot_number' => 'Slot',
+    // 'slot_number' => 'Slot',
     'vehicle_type' => 'Vehicle',
     'vehicle_number' => 'Vehicle Number',
     'flight_number' => 'Flight',
@@ -182,7 +182,7 @@ if (!empty($b['images'])) {
 
         <div class="col-6 col-lg-3">
             <label class="form-label fw-bold">Upload Images <span class="text-danger">*</span></label>
-            <input type="file" class="form-control" id="images" name="images[]" multiple accept="image/*" required>
+            <input type="file" class="form-control" id="images" name="images[]" multiple accept="image/*">
             <small class="text-muted">You can upload 5 or more images.</small>
         </div>
 

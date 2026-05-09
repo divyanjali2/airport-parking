@@ -24,13 +24,13 @@ try {
             booking_type,
             whatsapp_number,
             total_price_final,
-            status
+            booking_status
         FROM reserved_slots
         WHERE is_trashed = 0
         AND is_no_show = 0
-        ORDER BY 
-            CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
-            created_at DESC
+        AND cash_handover = 0
+        AND booking_status = 'confirmed'
+        ORDER BY created_at DESC
     ");
 
     $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -39,25 +39,26 @@ try {
     die('<div style="color:red;">Database error: ' . $e->getMessage() . '</div>');
 }
 
-
 try {
-    $stmtPrev = $conn->query("
-        SELECT 
+    $stmtCash = $conn->query("
+        SELECT
             id,
-            vehicle_type,
-            start_date,
-            end_date,
+            reference_number,
             name,
-            whatsapp_number,
-            days,
-            price_per_day,
-            total_price
-        FROM previous_bookings
-        ORDER BY start_date DESC
+            total_price_final
+        FROM reserved_slots
+        WHERE payment_status = 'Paid Fully'
+        AND cash_handover = 0
+        AND booking_status = 'confirmed'
+        AND is_trashed = 0
+        AND is_no_show = 0
+        ORDER BY created_at DESC
     ");
-    $previousBookings = $stmtPrev->fetchAll(PDO::FETCH_ASSOC);
+
+    $cashHandoverBookings = $stmtCash->fetchAll(PDO::FETCH_ASSOC);
+
 } catch (PDOException $e) {
-    die('<div style="color:red;">Database error (previous_bookings): ' . $e->getMessage() . '</div>');
+    die('<div style="color:red;">Database error (cash handover): ' . $e->getMessage() . '</div>');
 }
 ?>
 
@@ -95,11 +96,8 @@ try {
             <div class="container-fluid">
                 <div class="card dashboard-card">
                     <div class="d-flex justify-content-end">
-                        <!-- <a href="add-invoices.php" class="btn btn-warning text-dark me-2">
-                            Add Invoices
-                        </a> -->
-                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#directBookingModal">
-                            Add Direct Booking
+                         <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#cashHandoverModal">
+                            <i class="bi bi-cash-coin me-1"></i> Cash Handover
                         </button>
                     </div>
                     <h2 class="text-center fw-bold">🚘 Confirmed Booking Dashboard</h2>
@@ -204,218 +202,6 @@ try {
                             </tbody>
                         </table>
                     </div>
-
-                    <!-- Previous Bookings Table -->
-                    <hr class="my-4">
-                    <h4 class="text-center fw-bold">Previous Bookings</h4>
-                    <div class="mb-3 d-flex align-items-end gap-3 justify-content-end">
-                        <div>
-                            <label for="vehicleTypeFilterPrev" class="form-label">Filter by Vehicle Type:</label>
-                            <select id="vehicleTypeFilterPrev" class="form-select w-auto">
-                                <option value="">All</option>
-                                <option value="car">Car</option>
-                                <option value="van">Van</option>
-                                <option value="bus">Bus</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="dateFilterPrev" class="form-label">Filter by Date:</label>
-                            <input type="date" id="dateFilterPrev" class="form-control" style="width:160px;">
-                        </div>
-                        <div class="align-self-end">
-                            <button id="clearDateFilterPrev" class="btn btn-danger">Clear</button>
-                        </div>
-                        <div class="align-self-end">
-                            <button id="exportCSVPrev" class="btn btn-info">Export CSV</button>
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table id="previousBookingsTable" class="table table-bordered table-striped align-middle">
-                            <thead>
-                                <tr class="table-dark">
-                                    <th>#</th>
-                                    <th>Vehicle Type</th>
-                                    <th>Customer Name</th>
-                                    <th>WhatsApp</th>
-                                    <th>Start Date</th>
-                                    <th>End Date</th>
-                                    <th>Days</th>
-                                    <th>Price per Day (LKR)</th>
-                                    <th>Total Price (LKR)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach($previousBookings as $i => $b): ?>
-                                <tr>
-                                    <td><?= $i + 1 ?></td>
-                                    <td><?= htmlspecialchars($b['vehicle_type']) ?></td>
-                                    <td><?= htmlspecialchars($b['name']) ?></td>
-                                    <td><?= htmlspecialchars($b['whatsapp_number']) ?></td>
-                                    <td data-order="<?= $b['start_date'] ?>"><?= date('d M Y', strtotime($b['start_date'])) ?></td>
-                                    <td data-order="<?= $b['end_date'] ?>"><?= date('d M Y', strtotime($b['end_date'])) ?></td>
-                                    <td><?= number_format($b['days'],0) ?></td>
-                                    <td><?= number_format($b['price_per_day'],2) ?></td>
-                                    <td><?= number_format($b['total_price'],2) ?></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="modal fade" id="directBookingModal" tabindex="-1" aria-labelledby="directBookingLabel" aria-hidden="true">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <form id="direct-booking-form">
-                            <div class="modal-header">
-                                <h5 class="fw-bold modal-title" id="directBookingLabel">Add Direct Booking</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="row g-3">
-                                    <!-- Slot Dropdown -->
-                                    <div class="col-md-4">
-                                        <label>Slot Number <span class="text-danger">*</span></label>
-                                        <select id="slot-number" class="form-select" required>
-                                            <option value="">Select Slot</option>
-                                            <option value="A1">A1</option>
-                                            <option value="A2">A2</option>
-                                            <option value="B1">B1</option>
-                                            <option value="B2">B2</option>
-                                            <option value="C1">C1</option>
-                                        </select>
-                                    </div>
-
-                                    <!-- Vehicle Type -->
-                                    <div class="col-md-4">
-                                        <label>Vehicle Type <span class="text-danger">*</span></label>
-                                        <select id="vehicle-type" class="form-select" required>
-                                            <option value="">Select vehicle</option>
-                                            <option value="car">Car</option>
-                                            <option value="van">Van</option>
-                                            <option value="bus">Bus</option>
-                                        </select>
-                                    </div>
-
-                                     <div class="col-md-4">
-                                        <label>Vehicle Number <span class="text-danger">*</span></label>
-                                        <input type="text" id="vehicle_number" class="form-control" required placeholder="Enter vehicle number">
-                                    </div>
-
-                                    <!-- Flight Number -->
-                                    <div class="col-md-4">
-                                        <label>Flight Number <span class="text-danger">*</span></label>
-                                        <input type="text" id="flight-number" class="form-control" required placeholder="Enter flight number">
-                                    </div>
-
-                                    <!-- Dates -->
-                                    <div class="col-md-4">
-                                        <label>Start Date & Time <span class="text-danger">*</span></label>
-                                        <input type="datetime-local" id="start-date" class="form-control" required>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label>End Date & Time <span class="text-danger">*</span></label>
-                                        <input type="datetime-local" id="end-date" class="form-control" required>
-                                    </div>
-
-                                    <!-- Customer Info -->
-                                    <div class="col-md-4">
-                                        <label>Name <span class="text-danger">*</span></label>
-                                        <input type="text" id="user-name" class="form-control" required placeholder="Enter customer name">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label>Hometown <span class="text-danger">*</span></label>
-                                        <input type="text" id="hometown" class="form-control" required placeholder="Enter hometown">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label>Email <span class="text-danger">*</span></label>
-                                        <input type="email" id="user-email" class="form-control" required placeholder="Enter email address">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label>WhatsApp Number <span class="text-danger">*</span></label>
-                                        <input type="number" id="whatsapp-number" class="form-control" required placeholder="94771234567 (without + or spaces)">
-                                    </div>
-
-                                    <div class="col-md-4">
-                                        <label>Air Ticket Image <span class="text-danger">*</span></label>
-                                        <input type="file" id="air_ticket_image_url"  class="form-control" name="air_ticket_image_url" accept="image/*" required>
-                                    </div>
-
-                                    <div class="col-md-4">
-                                        <label>Passport Copy Image <span class="text-danger">*</span></label>
-                                        <input type="file" id="passport_copy_image_url"  class="form-control" name="passport_copy_image_url" accept="image/*" required>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label>Passenger Count <span class="text-danger">*</span></label>
-                                        <input type="number" id="passenger_count" name="passenger_count" class="form-control" min="1" placeholder="Enter Passenger Count" required>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="receiver_name">Received By <span class="text-danger">*</span></label>
-                                        <select id="receiver_name" class="form-select" required>
-                                            <option value="">Select Receiver</option>
-                                            <option value="Primali">Primali</option>
-                                            <option value="Gayan">Gayan</option>
-                                            <option value="Tharindu">Tharindu</option>
-                                        </select>
-                                    </div>
-
-                                    <hr>
-
-                                    <!-- Extra Services -->
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <p><strong>Extra Services</strong></p>
-                                            <label><input type="checkbox" class="extra-service" value="Body Wash & Vacuum" data-price="1000"> Body Wash & Vacuum (LKR 1,000)</label><br>
-                                            <label><input type="checkbox" class="extra-service mt-2" value="Shuttle One Way" data-price="500"> Shuttle One Way (LKR 500)</label><br>
-                                            <label><input type="checkbox" class="extra-service mt-2" value="Shuttle Two Way" data-price="1000"> Shuttle Two Way (LKR 1,000)</label>
-                                        </div>
-                    
-                                        <!-- Calculated Total -->
-                                        <div class="col-md-6 mt-3">
-                                            <label><strong>Total Price (LKR):</strong></label>
-                                            <div id="calculated-price" class="fw-bold fs-5">0</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Save Booking</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal fade" id="noShowModal" tabindex="-1" aria-labelledby="noShowModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <form id="noShowForm">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="noShowModalLabel">Mark as No Show</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <input type="hidden" id="no_show_booking_id">
-
-                                <div class="mb-3">
-                                    <label class="form-label">Reference No</label>
-                                    <input type="text" id="no_show_reference" class="form-control" readonly>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="no_show_reason" class="form-label">Reason <span class="text-danger">*</span></label>
-                                    <textarea id="no_show_reason" class="form-control" rows="4" placeholder="Enter reason" required></textarea>
-                                </div>
-
-                                <p class="mb-0 text-danger">This booking will be marked as no show and hidden from the active list.</p>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-danger">Yes, Mark No Show</button>
-                            </div>
-                        </form>
-                    </div>
                 </div>
             </div>
 
@@ -431,6 +217,82 @@ try {
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content" id="paymentReceiptContent">
                         <!-- Loaded via AJAX -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="cashHandoverModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <form id="cashHandoverForm">
+                            <div class="modal-header">
+                                <h5 class="modal-title fw-bold">
+                                    <i class="bi bi-cash-coin me-1"></i> Cash Handover
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+
+                            <div class="modal-body">
+                                <?php if (!empty($cashHandoverBookings)): ?>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered align-middle" id="cashHandoverTable">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th style="width:50px;">Select</th>
+                                                    <th>Reference No</th>
+                                                    <th>Customer</th>
+                                                    <th class="text-end">Amount (LKR)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($cashHandoverBookings as $c): ?>
+                                                    <tr>
+                                                        <td class="text-center">
+                                                           <input
+                                                                type="checkbox"
+                                                                class="form-check-input cash-handover-check"
+                                                                name="booking_ids[]"
+                                                                value="<?= $c['id'] ?>"
+                                                                data-amount="<?= htmlspecialchars($c['total_price_final'] ?? 0) ?>"
+                                                                data-reference="<?= htmlspecialchars($c['reference_number']) ?>"
+                                                            >
+                                                        </td>
+                                                        <td><?= htmlspecialchars($c['reference_number']) ?></td>
+                                                        <td><?= htmlspecialchars($c['name']) ?></td>
+                                                        <td class="text-end">
+                                                            <?= number_format((float)($c['total_price_final'] ?? 0), 2) ?>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div class="text-end mt-3">
+                                        <h5>
+                                            Total Selected :
+                                            <span class="fw-bold text-danger">
+                                                LKR <span id="cashHandoverTotal">0.00</span>
+                                            </span>
+                                        </h5>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="alert alert-info mb-0">
+                                        No cash handovers at the moment.
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    Close
+                                </button>
+
+                                <button type="submit" class="btn btn-warning" id="saveCashHandover">
+                                    Save Handover
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -467,54 +329,8 @@ try {
     </script>
 
     <script>
-        $(document).on('click', '.no-show-btn', function () {
-            $('#no_show_booking_id').val($(this).data('id'));
-            $('#no_show_reference').val($(this).data('reference'));
-            $('#no_show_reason').val('');
-
-            bootstrap.Modal.getOrCreateInstance(
-                document.getElementById('noShowModal')
-            ).show();
-        });
-
-        $(document).on('submit', '#noShowForm', function (e) {
-            e.preventDefault();
-
-            const id = $('#no_show_booking_id').val();
-            const reason = $('#no_show_reason').val().trim();
-
-            if (!reason) {
-                alert('Please enter a reason.');
-                $('#no_show_reason').focus();
-                return;
-            }
-
-            $.ajax({
-                url: 'assets/includes/mark-no-show.php',
-                type: 'POST',
-                dataType: 'json',
-                data: {
-                    id: id,
-                    reason: reason
-                },
-                success: function (res) {
-                    if (res.success) {
-                        bootstrap.Modal.getInstance(document.getElementById('noShowModal')).hide();
-                        location.reload();
-                    } else {
-                        alert(res.message || 'Failed to mark as no show.');
-                    }
-                },
-                error: function () {
-                    alert('Server error while marking as no show.');
-                }
-            });
-        });
-    </script>
-
-    <script>
         $(function () {
-            const table = $('#bookingsTable').DataTable({
+            const table = $('#bookingsTable, #cashHandoverTable').DataTable({
                 pageLength: 50,
                 lengthMenu: [5, 10, 25, 50],
                 // order: [[7, 'desc']],
@@ -651,81 +467,6 @@ try {
             // Recalculate when inputs change
             $('#start-date, #end-date, .extra-service').on('change', calculateTotal);
 
-            $('#direct-booking-form').on('submit', function(e) {
-                e.preventDefault();
-
-                const $saveBtn = $(this).find('button[type="submit"]');
-                $saveBtn.prop('disabled', true).text('Saving...');
-
-                const startVal = $('#start-date').val();
-                const endVal = $('#end-date').val();
-                if (!startVal || !endVal) {
-                    alert("Please select both start and end dates.");
-                    $saveBtn.prop('disabled', false).text('Save Booking');
-                    return;
-                }
-
-                const extras = $('.extra-service:checked').map(function(){ return this.value; }).get();
-                const daysFraction = (new Date(endVal) - new Date(startVal)) / (1000*60*60*24);
-                const totalPrice = calculateTotal(); 
-
-                const formData = new FormData();
-                formData.append('slot', $('#slot-number').val());
-                formData.append('vehicleType', $('#vehicle-type').val());
-                formData.append('flightNumber', $('#flight-number').val());
-                formData.append('vehicleNumber', $('#vehicle_number').val());
-                formData.append('startDate', startVal);
-                formData.append('endDate', endVal);
-                formData.append('name', $('#user-name').val());
-                formData.append('hometown', $('#hometown').val());
-                formData.append('receiver_name', $('#receiver_name').val());
-                formData.append('email', $('#user-email').val());
-                formData.append('whatsapp', $('#whatsapp-number').val());
-                formData.append('pricePerDay', 1000);
-                formData.append('days', daysFraction);
-                formData.append('passenger_count', $('#passenger_count').val());
-                formData.append('totalPrice', calculateTotal());
-                formData.append('remarks', '');
-                formData.append('receiverName', '');
-                formData.append('booking_type', 'direct booking');
-
-                // Append extras as array
-                extras.forEach(extra => formData.append('extras[]', extra));
-
-                // Append image files
-                const airTicketFile = $('#air_ticket_image_url')[0].files[0];
-                const passportFile = $('#passport_copy_image_url')[0].files[0];
-                if (airTicketFile) formData.append('air_ticket_image_url', airTicketFile);
-                if (passportFile) formData.append('passport_copy_image_url', passportFile);
-
-                $.ajax({
-                    url: 'assets/includes/save-booking.php',
-                    type: 'POST',
-                    data: formData,
-                    processData: false,  
-                    contentType: false,  
-                    success: function(res) {
-                        if (res.success) {
-                            const modalEl = document.getElementById('directBookingModal');
-                            const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-                            modal.hide();
-
-                            setTimeout(function() {
-                                alert("Booking saved successfully: " + res.reference);
-                                location.reload();
-                            }, 200);
-                        } else {
-                            alert("Error: " + res.detail);
-                            $saveBtn.prop('disabled', false).text('Save Booking');
-                        }
-                    },
-                    error: function() {
-                        alert("Server error. Please try again.");
-                        $saveBtn.prop('disabled', false).text('Save Booking');
-                    }
-                });
-            });
-
         });
     </script>
 
@@ -834,5 +575,68 @@ try {
             });
         });
     </script>
+
+    <script>
+        $(document).on('change', '.cash-handover-check', function () {
+            let total = 0;
+
+            $('.cash-handover-check:checked').each(function () {
+                total += parseFloat($(this).data('amount')) || 0;
+            });
+
+            $('#cashHandoverTotal').text(
+                total.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                })
+            );
+        });
+
+        $(document).on('submit', '#cashHandoverForm', function (e) {
+            e.preventDefault();
+
+            const bookingIds = [];
+            $('.cash-handover-check:checked').each(function () {
+                bookingIds.push($(this).val());
+            });
+
+            if (bookingIds.length === 0) {
+                alert('Please select at least one booking.');
+                return;
+            }
+
+            $('#saveCashHandover').prop('disabled', true).text('Saving...');
+
+            $.ajax({
+                url: 'assets/includes/save-cash-handover.php',
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    booking_ids: bookingIds
+                },
+                success: function (res) {
+                    if (res.success) {
+                        alert('Cash handover saved successfully.');
+                        location.reload();
+                    } else {
+                        alert(res.message || 'Failed to save cash handover.');
+                        $('#saveCashHandover').prop('disabled', false).text('Save Handover');
+                    }
+                },
+                error: function () {
+                    alert('Server error while saving cash handover.');
+                    $('#saveCashHandover').prop('disabled', false).text('Save Handover');
+                }
+            });
+        });
+    </script>`
+
+    
+     <script>
+    document.getElementById('paymentReceiptModal')
+        .addEventListener('hidden.bs.modal', function () {
+            location.reload();
+        });
+</script>                               
 </body>
 </html>

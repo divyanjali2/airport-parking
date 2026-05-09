@@ -17,7 +17,7 @@ if (!is_dir($folderPath)) {
     die("Folder not found");
 }
 
-// Get all PDFs
+
 $files = glob($folderPath . "/*.pdf");
 
 if (!$files) {

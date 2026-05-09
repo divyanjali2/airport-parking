@@ -9,12 +9,90 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 try {
-    $reservationsCount = $conn->query("SELECT COUNT(*) FROM reserved_slots")->fetchColumn();
-    $usersCount = $conn->query("SELECT COUNT(*) FROM users")->fetchColumn();
+    $reservationsCount = $conn->query("
+        SELECT COUNT(*) 
+        FROM reserved_slots
+        WHERE is_trashed = 0
+        AND is_no_show = 0
+    ")->fetchColumn();
 
-    $pendingCount = $conn->query("SELECT COUNT(*) FROM reserved_slots WHERE status = 'pending' AND is_trashed = 0")->fetchColumn();
-    $financeCount = $conn->query("SELECT COUNT(*) FROM reserved_slots WHERE status = 'send_to_finance' AND is_trashed = 0")->fetchColumn();
-    $acceptedCount = $conn->query("SELECT COUNT(*) FROM reserved_slots WHERE status = 'accepted' AND is_trashed = 0")->fetchColumn();
+    $usersCount = $conn->query("
+        SELECT COUNT(*) 
+        FROM users
+    ")->fetchColumn();
+
+    $pendingCount = $conn->query("
+        SELECT COUNT(*) 
+        FROM reserved_slots 
+        WHERE booking_status = 'pending'
+        AND is_trashed = 0
+        AND is_no_show = 0
+    ")->fetchColumn();
+
+    $confirmedCount = $conn->query("
+        SELECT COUNT(*) 
+        FROM reserved_slots 
+        WHERE booking_status = 'confirmed'
+        AND is_trashed = 0
+        AND is_no_show = 0
+    ")->fetchColumn();
+
+    $cashHandoverPendingCount = $conn->query("
+        SELECT COUNT(*) 
+        FROM reserved_slots 
+        WHERE booking_status = 'confirmed'
+        AND payment_status = 'Paid Fully'
+        AND cash_handover = 0
+        AND is_trashed = 0
+        AND is_no_show = 0
+    ")->fetchColumn();
+
+    $cashHandedOverCount = $conn->query("
+        SELECT COUNT(*) 
+        FROM reserved_slots 
+        WHERE booking_status = 'confirmed'
+        AND cash_handover = 1
+        AND is_trashed = 0
+        AND is_no_show = 0
+    ")->fetchColumn();
+
+    $cashReceivePendingCount = $conn->query("
+        SELECT COUNT(DISTINCT CONCAT(handover_batch, '|', handover_datetime))
+        FROM reserved_slots
+        WHERE booking_status = 'confirmed'
+        AND cash_handover = 1
+        AND (cash_received_status IS NULL OR cash_received_status = 'pending')
+        AND is_trashed = 0
+        AND is_no_show = 0
+    ")->fetchColumn();
+
+    $cashAcceptedCount = $conn->query("
+        SELECT COUNT(DISTINCT CONCAT(handover_batch, '|', handover_datetime))
+        FROM reserved_slots
+        WHERE booking_status = 'confirmed'
+        AND cash_handover = 1
+        AND cash_received_status = 'accepted'
+        AND is_trashed = 0
+        AND is_no_show = 0
+    ")->fetchColumn();
+
+    $totalConfirmedAmount = $conn->query("
+        SELECT COALESCE(SUM(COALESCE(total_price_final, total_price, 0)), 0)
+        FROM reserved_slots
+        WHERE booking_status = 'confirmed'
+        AND is_trashed = 0
+        AND is_no_show = 0
+    ")->fetchColumn();
+
+    $totalAcceptedCashAmount = $conn->query("
+        SELECT COALESCE(SUM(COALESCE(total_price_final, total_price, 0)), 0)
+        FROM reserved_slots
+        WHERE booking_status = 'confirmed'
+        AND cash_handover = 1
+        AND cash_received_status = 'accepted'
+        AND is_trashed = 0
+        AND is_no_show = 0
+    ")->fetchColumn();
 
 } catch (PDOException $e) {
     die('<div style="color:red;">Database error: ' . htmlspecialchars($e->getMessage()) . '</div>');
@@ -170,56 +248,77 @@ $userRole = $_SESSION['user_role'] ?? '';
 
             <h4 class="section-title">Overview</h4>
 
-            <div class="row g-4">
-                <div class="col-md-6 col-xl-4">
+            <div class="row g-4 d-flex align-items-center justify-content-center">
+                <div class="col-md-6 col-xl-3">
                     <div class="dashboard-card bg-soft-primary">
                         <div class="card-icon icon-primary">
                             <i class="bi bi-calendar-check"></i>
                         </div>
                         <h3><?= (int)$reservationsCount ?></h3>
-                        <p>Total Reservations</p>
+                        <p>Total Active Reservations</p>
                     </div>
                 </div>
 
-                <div class="col-md-6 col-xl-4">
-                    <div class="dashboard-card bg-soft-success">
-                        <div class="card-icon icon-success">
-                            <i class="bi bi-people"></i>
-                        </div>
-                        <h3><?= (int)$usersCount ?></h3>
-                        <p>Registered Users</p>
-                    </div>
-                </div>
-
-                <div class="col-md-6 col-xl-4">
+                <div class="col-md-6 col-xl-3">
                     <div class="dashboard-card bg-soft-warning">
                         <div class="card-icon icon-warning">
                             <i class="bi bi-hourglass-split"></i>
                         </div>
                         <h3><?= (int)$pendingCount ?></h3>
-                        <p>Pending Reservations</p>
+                        <p>Pending Bookings</p>
                     </div>
                 </div>
 
-                <div class="col-md-6 col-xl-6">
-                    <div class="dashboard-card bg-soft-info">
-                        <div class="card-icon icon-info">
-                            <i class="bi bi-send-check"></i>
-                        </div>
-                        <h3><?= (int)$financeCount ?></h3>
-                        <p>Sent to Finance</p>
-                    </div>
-                </div>
-
-                <div class="col-md-6 col-xl-6">
-                    <div class="dashboard-card bg-soft-dark">
-                        <div class="card-icon icon-dark">
+                <div class="col-md-6 col-xl-3">
+                    <div class="dashboard-card bg-soft-success">
+                        <div class="card-icon icon-success">
                             <i class="bi bi-patch-check"></i>
                         </div>
-                        <h3><?= (int)$acceptedCount ?></h3>
-                        <p>Accepted Reservations</p>
+                        <h3><?= (int)$confirmedCount ?></h3>
+                        <p>Confirmed Bookings</p>
                     </div>
                 </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="dashboard-card bg-soft-info">
+                        <div class="card-icon icon-info">
+                            <i class="bi bi-cash-coin"></i>
+                        </div>
+                        <h3><?= (int)$cashHandoverPendingCount ?></h3>
+                        <p>Pending Cash Handovers</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="dashboard-card bg-soft-success">
+                        <div class="card-icon icon-success">
+                            <i class="bi bi-cash-stack"></i>
+                        </div>
+                        <h3><?= (int)$cashHandedOverCount ?></h3>
+                        <p>Cash Handed Over Bookings</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="dashboard-card bg-soft-warning">
+                        <div class="card-icon icon-warning">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+                        <h3><?= (int)$cashReceivePendingCount ?></h3>
+                        <p>Cash Receive Pending Batches</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="dashboard-card bg-soft-primary">
+                        <div class="card-icon icon-primary">
+                            <i class="bi bi-check2-circle"></i>
+                        </div>
+                        <h3><?= (int)$cashAcceptedCount ?></h3>
+                        <p>Accepted Cash Batches</p>
+                    </div>
+                </div>
+
             </div>
 
         </div>
