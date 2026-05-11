@@ -13,47 +13,36 @@ try {
     exit('Database error');
 }
 
-// Fields to display in modal
 $fields = [
     'name' => 'Customer',
     'email' => 'Email',
     'whatsapp_number' => 'WhatsApp',
-    // 'slot_number' => 'Slot',
     'vehicle_type' => 'Vehicle',
-    'vehicle_number' => 'Vehicle Number',
-    'flight_number' => 'Flight',
     'start_date' => 'Start Date',
     'end_date' => 'End Date',
     'total_price' => 'Total Price (LKR)',
     'receiver_name' => 'Receiver Name',
-    'passenger_count' => 'Passenger Count'
+    'passenger_count' => 'Passenger Count',
+    'vehicle_number' => 'Vehicle Number',
+    'flight_number' => 'Flight',
 ];
 
-// Show Air Ticket and Passport Copy
 $airTicket = !empty($b['air_ticket_image_url']) ? $b['air_ticket_image_url'] : null;
 $passportCopy = !empty($b['passport_copy_image_url']) ? $b['passport_copy_image_url'] : null;
 
 function toWebPath($path) {
+
     if (!$path) return null;
 
+    // already full URL
     if (preg_match('#^https?://#i', $path)) {
         return $path;
     }
 
     $path = str_replace('\\', '/', $path);
+    $path = ltrim($path, '/');
 
-    if (isset($_SERVER['DOCUMENT_ROOT']) && strpos($path, $_SERVER['DOCUMENT_ROOT']) === 0) {
-        $path = substr($path, strlen($_SERVER['DOCUMENT_ROOT']));
-    }
-
-    if (!empty($path) && $path[0] !== '/') {
-        $path = '/' . $path;
-    }
-
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $baseUrl = $protocol . '://' . $_SERVER['HTTP_HOST'];
-
-    return $baseUrl . $path;
+    return 'http://' . $_SERVER['HTTP_HOST'] . '/' . $path;
 }
 
 function toDatetimeLocal($dt) {
@@ -86,71 +75,80 @@ if (!empty($b['images'])) {
 ?>
 
 <div class="modal-header">
-    <h5 class="fw-bold modal-title">Edit Booking – <?= htmlspecialchars($b['reference_number']) ?></h5>
+    <h5 class="fw-bold modal-title">
+        Edit Booking - <?= htmlspecialchars($b['reference_number']) ?>
+    </h5>
     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 </div>
 
 <div class="modal-body">
+
+    <!-- VEHICLE + FLIGHT -->
     <div class="row g-3">
         <?php foreach ($fields as $k => $label): ?>
             <div class="col-md-3">
                 <label class="form-label"><?= htmlspecialchars($label) ?></label>
-                <input class="form-control" value="<?= htmlspecialchars($b[$k] ?? '') ?>" readonly>
+
+                <?php if (in_array($k, ['vehicle_number', 'flight_number'])): ?>
+                    <!-- editable fields -->
+                    <input class="form-control" id="<?= $k ?>" value="<?= htmlspecialchars($b[$k] ?? '') ?>">
+
+                <?php else: ?>
+                    <!-- all other fields disabled -->
+                    <input class="form-control" value="<?= htmlspecialchars($b[$k] ?? '') ?>" disabled>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
+
+        <div class="col-12 text-end mt-2">
+            <button class="btn btn-success" id="saveTransport" data-id="<?= $b['id'] ?>">
+                Save Vehicle & Flight
+            </button>
+        </div>
     </div>
 
     <hr>
 
+    <!-- AIR TICKET -->
     <div class="row">
-        <div class="col-6 mt-2">
-            <label class="form-label fw-bold">Air Ticket Image</label><br>
+        <div class="col-6">
+            <label class="fw-bold">Air Ticket</label><br>
+
             <?php if ($airTicket): ?>
-                <a href="<?= htmlspecialchars(toWebPath($airTicket)) ?>" target="_blank">
-                    <img src="<?= htmlspecialchars(toWebPath($airTicket)) ?>" style="height:120px; margin-right:5px;" alt="Air Ticket">
-                </a>
+                <img src="<?= htmlspecialchars(toWebPath($airTicket)) ?>" style="height:120px;">
             <?php else: ?>
-                N/A
+                <p>No Air Ticket</p>
             <?php endif; ?>
+
+            <input type="file" id="air_ticket_image" class="form-control mt-2" accept="image/*">
+
+            <button class="btn btn-primary mt-2" id="saveAirTicket" data-id="<?= $b['id'] ?>">
+                Update Air Ticket
+            </button>
         </div>
 
-        <div class="col-6 mt-2">
-            <label class="form-label fw-bold">Passport Copy Image</label><br>
+        <div class="col-6">
+            <label class="fw-bold">Passport Copy</label><br>
             <?php if ($passportCopy): ?>
-                <a href="<?= htmlspecialchars(toWebPath($passportCopy)) ?>" target="_blank">
-                    <img src="<?= htmlspecialchars(toWebPath($passportCopy)) ?>" style="height:120px; margin-right:5px;" alt="Passport Copy">
-                </a>
+                <img src="<?= htmlspecialchars(toWebPath($passportCopy)) ?>" style="height:120px;">
             <?php else: ?>
-                N/A
+                <p>N/A</p>
             <?php endif; ?>
         </div>
     </div>
 
     <hr>
 
-    <div class="row g-3">
+    <!-- METER -->
+   <div class="row g-3">
         <div class="col-md-6 col-lg-3">
             <label class="form-label fw-bold">Meter Reading (km) <span class="text-danger">*</span></label>
-            <input
-                type="number"
-                class="form-control"
-                id="meter_reading"
-                value="<?= htmlspecialchars($b['meter_reading'] ?? '') ?>"
-                placeholder="Enter meter reading"
-                required
-            >
+            <input type="number" class="form-control" id="meter_reading" value="<?= htmlspecialchars($b['meter_reading'] ?? '') ?>" placeholder="Enter meter reading" required >
         </div>
 
         <div class="col-md-6 col-lg-3">
             <label class="form-label fw-bold">New End Date/Time</label>
-            <input
-                type="datetime-local"
-                class="form-control"
-                id="edited_end_date"
-                value="<?= htmlspecialchars(toDatetimeLocal($editedEndDb ?: $originalEnd)) ?>"
-                data-original-end="<?= htmlspecialchars($originalEnd ?? '') ?>"
-                data-existing-edited="<?= htmlspecialchars($editedEndDb ?? '') ?>"
-            >
+            <input type="datetime-local" class="form-control" id="edited_end_date" value="<?= htmlspecialchars(toDatetimeLocal($editedEndDb ?: $originalEnd)) ?>" data-original-end="<?= htmlspecialchars($originalEnd ?? '') ?>" data-existing-edited="<?= htmlspecialchars($editedEndDb ?? '') ?>" >
             <?php if ($editedEndDb): ?>
                 <small class="text-success">
                     Previously edited on: <?= htmlspecialchars($b['end_date_edited_at'] ?? '') ?>
@@ -164,13 +162,7 @@ if (!empty($b['images'])) {
 
         <div class="col-md-6 col-lg-3">
             <label class="form-label fw-bold">Updated Total Price (LKR)</label>
-            <input
-                type="text"
-                class="form-control"
-                id="updated_total_price"
-                value="<?= htmlspecialchars(number_format($finalTotalPrice, 2, '.', '')) ?>"
-                readonly
-            >
+            <input type="text" class="form-control" id="updated_total_price" value="<?= htmlspecialchars(number_format($finalTotalPrice, 2, '.', '')) ?>" readonly >
             <small class="text-muted" id="late_fee_label">
                 <?php if ($editedEndDb && ($lateFeePercentDb > 0 || $lateFeeAmountDb > 0)): ?>
                     Late surcharge: <?= (int)$lateFeePercentDb ?>% (LKR <?= number_format($lateFeeAmountDb, 2) ?>)
@@ -219,93 +211,149 @@ if (!empty($b['images'])) {
 </div>
 
 <div class="modal-footer">
-    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-    <button class="btn btn-primary" id="saveRemark" data-id="<?= (int)$b['id'] ?>">Save Remark</button>
+    <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
 </div>
 
 <script>
-(function () {
-    const baseTotalPrice = <?= json_encode((float)$baseTotalPrice) ?>;
+    (function () {
+        const baseTotalPrice = <?= json_encode((float)$baseTotalPrice) ?>;
 
-    const $editedEndDate = $('#edited_end_date');
-    const $updatedTotalPrice = $('#updated_total_price');
-    const $lateFeeLabel = $('#late_fee_label');
-    const $moveToTrash = $('#move-to-trash');
-    const $remarkRequired = $('#remarkRequired');
-    const $editRemark = $('#edit-remark');
+        const $editedEndDate = $('#edited_end_date');
+        const $updatedTotalPrice = $('#updated_total_price');
+        const $lateFeeLabel = $('#late_fee_label');
+        const $moveToTrash = $('#move-to-trash');
+        const $remarkRequired = $('#remarkRequired');
+        const $editRemark = $('#edit-remark');
 
-    function parseDbDate(str) {
-        if (!str) return null;
-        const normalized = String(str).replace(/\//g, '-').replace(' ', 'T');
-        const dt = new Date(normalized);
-        return isNaN(dt.getTime()) ? null : dt;
-    }
-
-    function getSurchargePercent(lateMinutesAfterGrace) {
-        if (lateMinutesAfterGrace <= 0) return 0;
-        if (lateMinutesAfterGrace <= 120) return 25;
-        if (lateMinutesAfterGrace <= 240) return 50;
-        if (lateMinutesAfterGrace <= 360) return 75;
-        return 100;
-    }
-
-    function recalcPricePreview() {
-        const editedVal = $editedEndDate.val();
-        const originalDb = $editedEndDate.attr('data-original-end');
-
-        if (!editedVal || !originalDb) {
-            $updatedTotalPrice.val(baseTotalPrice.toFixed(2));
-            $lateFeeLabel.text('');
-            return;
+        function parseDbDate(str) {
+            if (!str) return null;
+            const normalized = String(str).replace(/\//g, '-').replace(' ', 'T');
+            const dt = new Date(normalized);
+            return isNaN(dt.getTime()) ? null : dt;
         }
 
-        const originalEnd = parseDbDate(originalDb);
-        const editedEnd = new Date(editedVal);
-
-        if (!originalEnd || isNaN(originalEnd.getTime()) || isNaN(editedEnd.getTime())) {
-            $updatedTotalPrice.val(baseTotalPrice.toFixed(2));
-            $lateFeeLabel.text('Invalid date format.');
-            return;
+        function getSurchargePercent(lateMinutesAfterGrace) {
+            if (lateMinutesAfterGrace <= 0) return 0;
+            if (lateMinutesAfterGrace <= 120) return 25;
+            if (lateMinutesAfterGrace <= 240) return 50;
+            if (lateMinutesAfterGrace <= 360) return 75;
+            return 100;
         }
 
-        const graceMs = 2 * 60 * 60 * 1000;
-        const graceEnd = new Date(originalEnd.getTime() + graceMs);
+        function recalcPricePreview() {
+            const editedVal = $editedEndDate.val();
+            const originalDb = $editedEndDate.attr('data-original-end');
 
-        const diffMs = editedEnd.getTime() - graceEnd.getTime();
-        const lateMinutesAfterGrace = Math.ceil(diffMs / (60 * 1000));
+            if (!editedVal || !originalDb) {
+                $updatedTotalPrice.val(baseTotalPrice.toFixed(2));
+                $lateFeeLabel.text('');
+                return;
+            }
 
-        const pct = getSurchargePercent(lateMinutesAfterGrace);
-        const lateFee = baseTotalPrice * (pct / 100);
-        const updated = baseTotalPrice + lateFee;
+            const originalEnd = parseDbDate(originalDb);
+            const editedEnd = new Date(editedVal);
 
-        $updatedTotalPrice.val(updated.toFixed(2));
+            if (!originalEnd || isNaN(originalEnd.getTime()) || isNaN(editedEnd.getTime())) {
+                $updatedTotalPrice.val(baseTotalPrice.toFixed(2));
+                $lateFeeLabel.text('Invalid date format.');
+                return;
+            }
 
-        if (pct === 0) {
-            $lateFeeLabel.text('Within grace period (0% surcharge).');
-        } else {
-            $lateFeeLabel.text(`Late surcharge: ${pct}% (LKR ${lateFee.toFixed(2)})`);
+            const graceMs = 2 * 60 * 60 * 1000;
+            const graceEnd = new Date(originalEnd.getTime() + graceMs);
+
+            const diffMs = editedEnd.getTime() - graceEnd.getTime();
+            const lateMinutesAfterGrace = Math.ceil(diffMs / (60 * 1000));
+
+            const pct = getSurchargePercent(lateMinutesAfterGrace);
+            const lateFee = baseTotalPrice * (pct / 100);
+            const updated = baseTotalPrice + lateFee;
+
+            $updatedTotalPrice.val(updated.toFixed(2));
+
+            if (pct === 0) {
+                $lateFeeLabel.text('Within grace period (0% surcharge).');
+            } else {
+                $lateFeeLabel.text(`Late surcharge: ${pct}% (LKR ${lateFee.toFixed(2)})`);
+            }
         }
-    }
 
-    $moveToTrash.off('change.editTrash').on('change.editTrash', function () {
-        if (this.checked) {
+        $moveToTrash.off('change.editTrash').on('change.editTrash', function () {
+            if (this.checked) {
+                $remarkRequired.removeClass('d-none');
+                $editRemark.attr('required', true);
+            } else {
+                $remarkRequired.addClass('d-none');
+                $editRemark.removeAttr('required');
+            }
+        });
+
+        $editedEndDate.off('change.editEnd input.editEnd').on('change.editEnd input.editEnd', function () {
+            recalcPricePreview();
+        });
+
+        if ($moveToTrash.is(':checked')) {
             $remarkRequired.removeClass('d-none');
             $editRemark.attr('required', true);
-        } else {
-            $remarkRequired.addClass('d-none');
-            $editRemark.removeAttr('required');
         }
-    });
 
-    $editedEndDate.off('change.editEnd input.editEnd').on('change.editEnd input.editEnd', function () {
         recalcPricePreview();
+    })();
+
+    $('#saveTransport').on('click', function () {
+
+        $.post('assets/includes/update_booking_fields.php', {
+            id: $(this).data('id'),
+            vehicle_number: $('#vehicle_number').val(),
+            flight_number: $('#flight_number').val()
+        }, function (res) {
+
+            if (res.trim() === 'success') {
+                location.reload();
+            } else {
+                alert('Update failed: ' + res);
+            }
+        });
     });
 
-    if ($moveToTrash.is(':checked')) {
-        $remarkRequired.removeClass('d-none');
-        $editRemark.attr('required', true);
-    }
+    $('#saveAirTicket').on('click', function () {
 
-    recalcPricePreview();
-})();
+        const id = $(this).data('id');
+        const file = $('#air_ticket_image')[0].files[0];
+
+        if (!file) {
+            alert('Select image first');
+            return;
+        }
+
+        let formData = new FormData();
+        formData.append('id', id);
+        formData.append('air_ticket_image', file);
+
+        $.ajax({
+            url: 'assets/includes/update_air_ticket.php',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json', 
+
+            success: function (res) {
+
+                console.log(res);
+
+                if (res.success) {
+                    alert('Air Ticket updated successfully');
+                    location.reload();
+                } else {
+                    alert('Update failed: ' + res.message);
+                }
+            },
+
+            error: function (xhr) {
+                console.log(xhr.responseText);
+                alert('Server error');
+            }
+        });
+    });
 </script>
