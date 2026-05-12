@@ -1,54 +1,55 @@
 <?php
-session_start();
-require_once __DIR__ . '/assets/includes/db_connect.php';
+    session_start();
+    require_once __DIR__ . '/assets/includes/db_connect.php';
 
-date_default_timezone_set('Asia/Colombo');
+    date_default_timezone_set('Asia/Colombo');
 
-$receiptId = $_GET['receipt_id'] ?? null;
-if (!$receiptId) exit('Invalid receipt request');
+    $receiptId = $_GET['receipt_id'] ?? null;
+    if (!$receiptId) exit('Invalid receipt request');
 
-try {
-    $stmt = $conn->prepare("
-        SELECT 
-            pr.*,
-            rs.reference_number,
-            rs.slot_number,
-            rs.vehicle_number,
-            u.name AS generated_by_name
-        FROM payment_receipts pr
-        LEFT JOIN reserved_slots rs ON rs.id = pr.reserved_slot_id
-        LEFT JOIN users u ON u.id = pr.generated_by
-        WHERE pr.id = ?
-    ");
-    $stmt->execute([$receiptId]);
-    $r = $stmt->fetch(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $conn->prepare("
+            SELECT 
+                pr.*,
+                rs.reference_number,
+                rs.slot_number,
+                rs.vehicle_number,
+                u.name AS generated_by_name
+            FROM payment_receipts pr
+            LEFT JOIN reserved_slots rs ON rs.id = pr.reserved_slot_id
+            LEFT JOIN users u ON u.id = pr.generated_by
+            WHERE pr.id = ?
+        ");
+        $stmt->execute([$receiptId]);
+        $r = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$r) exit('Receipt not found');
-} catch (PDOException $e) {
-    exit('Database error');
-}
+        if (!$r) exit('Receipt not found');
+    } catch (PDOException $e) {
+        exit('Database error');
+    }
 
-$companyName = 'Airport Parking';
-$companyAddress = 'No. 371/5, Negombo Road, Seeduwa, Sri Lanka';
-$companyContact = 'info@airportparking.lk | +94 76 141 4557';
-$companyLogo = 'assets/images/logo.png'; 
+    $companyName = 'Airport Parking';
+    $companyAddress = 'No. 371/5, Negombo Road, Seeduwa, Sri Lanka';
+    $companyContact = 'info@airportparking.lk | +94 76 141 4557';
+    $companyLogo = 'assets/images/logo.png'; 
 
-$receiptNo = $r['receipt_no'] ?? '';
-$referenceNo = $r['reference_number'] ?? '';
-$generatedAt = $r['generated_at'] ?? date('d M Y, h:i A'); 
-$customerName = $r['customer_name'] ?? '-';
-$contactNumber = $r['contact_number'] ?? '-';
-$vehicleNumber = $r['vehicle_number'] ?? '-';
-$parkingLocation = $r['parking_location'] ?? ($r['slot_number'] ?? '-');
-$expectedParkingDuration = $r['expected_parking_duration'] ?? '-';
-$paymentAmount = (float)($r['payment_amount'] ?? 0);
-$paymentStatus = $r['payment_status'] ?? 'Paid Fully';
-$generatedBy = $r['generated_by_name'] ?? ('User ID ' . ($r['generated_by'] ?? '-'));
+    $receiptNo = $r['receipt_no'] ?? '';
+    $referenceNo = $r['reference_number'] ?? '';
+    $generatedAt = $r['generated_at'] ?? date('d M Y, h:i A'); 
+    $customerName = $r['customer_name'] ?? '-';
+    $contactNumber = $r['contact_number'] ?? '-';
+    $vehicleNumber = $r['vehicle_number'] ?? '-';
+    $parkingLocation = $r['parking_location'] ?? ($r['slot_number'] ?? '-');
+    $expectedParkingDuration = $r['expected_parking_duration'] ?? '-';
+    $paymentAmount = (float)($r['payment_amount'] ?? 0);
+    $paymentStatus = $r['payment_status'] ?? 'Paid Fully';
+    $generatedBy = $r['generated_by_name'] ?? ('User ID ' . ($r['generated_by'] ?? '-'));
 
-function h($value) {
-    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
-}
+    function h($value) {
+        return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+    }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -348,9 +349,9 @@ function h($value) {
     <div class="top-actions">
         <button class="print-btn" onclick="window.print()">Print</button>
         <button class="download-btn"
-    onclick="window.open('download_receipt.php?receipt_id=<?= $receiptId ?>', '_blank')">
-    Download PDF
-</button>
+            onclick="window.open('download_receipt.php?receipt_id=<?= $receiptId ?>', '_blank')">
+            Download PDF
+        </button>
     </div>
 
     <div class="receipt">
