@@ -51,6 +51,14 @@
             </li>
         <?php endif; ?>
 
+        <?php if (in_array($role, ['gm', 'admin'])): ?>
+            <li class="nav-item">
+                <a href="./reservation-summary.php" class="nav-link text-white <?= $currentPage === 'reservation-summary.php' ? 'active' : '' ?>" aria-current="page">
+                    <i class="bi bi-card-checklist me-2"></i> Reservation Summary
+                </a>
+            </li>
+        <?php endif; ?> 
+
         <?php if (in_array($role, ['staff', 'admin','finance'])): ?>
             <li class="nav-item">
                 <a href="./payment-receipts.php" class="nav-link text-white <?= $currentPage === 'payment-receipts.php' ? 'active' : '' ?>" aria-current="page">
@@ -87,14 +95,6 @@
             <li class="nav-item">
                 <a href="./invoice-batches.php" class="nav-link text-white <?= $currentPage === 'invoice-batches.php' ? 'active' : '' ?>" aria-current="page">
                     <i class="bi bi-receipt me-2"></i> Received Invoices
-                </a>
-            </li>
-        <?php endif; ?>
-
-        <?php if (in_array($role, ['gm', 'admin'])): ?>
-            <li class="nav-item">
-                <a href="./reservation-summary.php" class="nav-link text-white <?= $currentPage === 'reservation-summary.php' ? 'active' : '' ?>" aria-current="page">
-                    <i class="bi bi-card-checklist me-2"></i> Reservation Summary
                 </a>
             </li>
         <?php endif; ?> -->

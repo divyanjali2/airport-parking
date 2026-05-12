@@ -70,6 +70,30 @@ try {
 } catch (PDOException $e) {
     die('<div style="color:red;">Database error: ' . $e->getMessage() . '</div>');
 }
+
+try {
+    $stmtCash = $conn->query("
+        SELECT
+            id,
+            reference_number,
+            name,
+            start_date,
+            end_date,
+            total_price_final
+        FROM reserved_slots
+        WHERE payment_status = 'Paid Fully'
+        AND cash_handover = 0
+        AND booking_status = 'confirmed'
+        AND is_trashed = 0
+        AND is_no_show = 0
+        ORDER BY created_at DESC
+    ");
+
+    $cashHandoverBookings = $stmtCash->fetchAll(PDO::FETCH_ASSOC);
+
+} catch (PDOException $e) {
+    die('<div style="color:red;">Database error (cash handover): ' . $e->getMessage() . '</div>');
+}
 ?>
 
 <!DOCTYPE html>
@@ -99,6 +123,54 @@ try {
     <div class="flex-grow-1">
         <div class="container-fluid">
             <div class="card dashboard-card">
+
+                <h4 class="fw-bold mt-2">Cash Handover Pending</h4>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped align-middle" id="cashHandoverTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Reference No</th>
+                                <th>Customer</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th class="text-end">Amount (LKR)</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <?php foreach ($cashHandoverBookings as $c): ?>
+                                <tr>
+                                    <td>
+                                        <?= htmlspecialchars($c['reference_number']) ?>
+                                    </td>
+
+                                    <td>
+                                        <?= htmlspecialchars($c['name']) ?>
+                                    </td>
+
+                                    <td>
+                                        <?= !empty($c['start_date']) 
+                                            ? date('d M Y', strtotime($c['start_date'])) 
+                                            : 'N/A' ?>
+                                    </td>
+
+                                    <td>
+                                        <?= !empty($c['end_date']) 
+                                            ? date('d M Y', strtotime($c['end_date'])) 
+                                            : 'N/A' ?>
+                                    </td>
+
+                                    <td class="text-end">
+                                        <?= number_format((float)($c['total_price_final'] ?? 0), 2) ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <hr>
 
                 <h4 class="fw-bold">Pending Cash to Accept</h4>
 
@@ -260,6 +332,11 @@ $(function () {
     });
 
     $('#acceptedCashTable').DataTable({
+        pageLength: 50,
+        lengthMenu: [10, 25, 50, 100],
+        order: [[3, 'desc']]
+    });
+        $('#cashHandoverTable').DataTable({
         pageLength: 50,
         lengthMenu: [10, 25, 50, 100],
         order: [[3, 'desc']]

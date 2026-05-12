@@ -211,6 +211,7 @@ if (!empty($b['images'])) {
 </div>
 
 <div class="modal-footer">
+    <button class="btn btn-primary" id="saveRemark" data-id="<?= (int)$b['id'] ?>">Save Remark</button>
     <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
 </div>
 
