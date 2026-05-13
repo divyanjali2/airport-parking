@@ -109,45 +109,39 @@
         .header {
             display: flex;
             justify-content: space-between;
-            gap: 12px;
-            padding: 16px 18px;
-            border-bottom: 2px solid #111827;
             align-items: center;
+            padding: 18px 24px;
+            background: #e5e3df;
+            border-bottom: 3px solid #0b0833;
         }
 
         .header-left {
             display: flex;
-            gap: 12px;
             align-items: center;
+            gap: 14px;
         }
 
         .logo-box {
-            width: 58px;
-            height: 58px;
+            width: 170px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            flex-shrink: 0;
-            background: #fff;
         }
 
         .logo-box img {
             width: 100%;
-            height: 100%;
+            height: auto;
             object-fit: contain;
         }
 
-        .company-name {
-            font-size: 22px;
-            font-weight: 700;
-            margin: 0 0 4px;
+        .company-details {
+            margin-top: 6px;
         }
 
         .company-line {
             margin: 2px 0;
-            color: #374151;
+            color: #0c032e;
             font-size: 12px;
+            line-height: 1.4;
         }
 
         .header-right {
@@ -155,10 +149,20 @@
         }
 
         .receipt-title {
-            font-size: 24px;
+            font-size: 38px;
             font-weight: 800;
-            margin: 0 0 6px;
+            color: #0b0833;
             letter-spacing: 1px;
+            margin: 0;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .receipt-subtitle {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 6px;
+            letter-spacing: 0.5px;
         }
 
         .receipt-meta {
@@ -355,24 +359,35 @@
     </div>
 
     <div class="receipt">
-        <div class="header">
-            <div class="header-left">
-                <div>
-                    <img src="<?= h($companyLogo) ?>" alt="Company Logo">
-                </div>
-                <div>
-                    <h1 class="company-name"><?= h($companyName) ?></h1>
-                    <div class="company-line"><?= h($companyAddress) ?></div>
-                    <div class="company-line"><?= h($companyContact) ?></div>
-                </div>
-            </div>
+       <div class="header">
 
-            <div class="header-right">
-                <div class="receipt-title">PAYMENT RECEIPT</div>
-                <div class="receipt-meta"><strong>Receipt No:</strong> <?= h($receiptNo) ?></div>
-                <div class="receipt-meta"><strong>Generated:</strong> <?= h($generatedAt) ?></div>
+        <div class="header-left">
+            <div>
+                <div class="logo-box">
+                    <img src="assets/images/logo.png" alt="Airport Parking Logo">
+                </div>
+
+                <div class="company-details">
+                    <div class="company-line">
+                        <?= h($companyAddress) ?>
+                    </div>
+
+                    <div class="company-line">
+                        <?= h($companyContact) ?>
+                    </div>
+                </div>
             </div>
         </div>
+
+    <div class="header-right">
+        <h1 class="receipt-title">PAYMENT RECEIPT</h1>
+
+        <div class="receipt-subtitle">
+            Office payment and transaction
+        </div>
+    </div>
+
+</div>
 
         <div class="content">
             <div class="amount-bar">
