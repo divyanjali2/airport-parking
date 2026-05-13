@@ -85,74 +85,63 @@ ob_start();
             overflow: hidden;
         }
 
-        .header {
-            background: #ffffff;
-            color: #000000;
-            padding: 16px 18px;
-        }
+.header {
+    background: #e5e3df;
+    border-bottom: 3px solid #0b0833;
+    padding: 18px 22px;
+}
 
-        .header-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+.header-table {
+    width: 100%;
+    border-collapse: collapse;
+}
 
-        .header-table td {
-            vertical-align: top;
-            border: none;
-            padding: 0;
-        }
+.header-table td {
+    border: none;
+    vertical-align: middle;
+    padding: 0;
+}
 
-        .logo-cell {
-            width: 80px;
-        }
+.left-block {
+    width: 58%;
+}
 
-        .logo-box {
-            width: 62px;
-            height: 62px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            flex-shrink: 0;
-            background: #fff;
-        }
+.right-block {
+    width: 42%;
+    text-align: right;
+}
 
-        .logo-box img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
+.logo-box {
+    margin-bottom: 6px;
+}
 
-        .company-name {
-            font-size: 22px;
-            font-weight: bold;
-            margin: 0 0 4px 0;
-            color: #000000;
-        }
+.logo-box img {
+    width: 190px;
+    height: auto;
+}
 
-        .company-line {
-            font-size: 11px;
-            margin: 2px 0;
-            color: #000000;
-        }
+.company-line {
+    font-size: 11px;
+    color: #4b5563;
+    line-height: 1.5;
+    margin: 2px 0;
+}
 
-        .title-block {
-            text-align: right;
-        }
+.receipt-title {
+    font-size: 28px;
+    font-weight: bold;
+    color: #0b0833;
+    letter-spacing: 1px;
+    margin: 0;
+    line-height: 1;
+    white-space: nowrap;
+}
 
-        .receipt-title {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 0 0 6px 0;
-            letter-spacing: 1px;
-            color: #000000;
-        }
-
-        .receipt-sub {
-            font-size: 11px;
-            color: #000000;
-            margin: 0;
-        }
+.receipt-sub {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 6px;
+}
 
         .body {
             padding: 14px 18px 16px;
@@ -348,22 +337,36 @@ ob_start();
         <div class="header">
             <table class="header-table">
                 <tr>
-                    <td class="logo-cell">
+                    <td class="left-block">
+
                         <?php if ($logoDataUri): ?>
                             <div class="logo-box">
                                 <img src="<?= $logoDataUri ?>" alt="Logo">
                             </div>
                         <?php endif; ?>
+
+                        <div class="company-line">
+                            <?= h($companyAddress) ?>
+                        </div>
+
+                        <div class="company-line">
+                            <?= h($companyContact) ?>
+                        </div>
+
                     </td>
-                    <td>
-                        <div class="company-name"><?= h($companyName) ?></div>
-                        <div class="company-line"><?= h($companyAddress) ?></div>
-                        <div class="company-line"><?= h($companyContact) ?></div>
+
+                    <td class="right-block">
+
+                        <div class="receipt-title">
+                            PAYMENT RECEIPT
+                        </div>
+
+                        <div class="receipt-sub">
+                            Official payment and transaction
+                        </div>
+
                     </td>
-                    <td class="title-block">
-                        <div class="receipt-title">PAYMENT RECEIPT</div>
-                        <div class="receipt-sub">Official payment confirmation</div>
-                    </td>
+
                 </tr>
             </table>
         </div>

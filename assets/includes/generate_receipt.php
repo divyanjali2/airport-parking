@@ -151,8 +151,9 @@ try {
     $companyContact = 'info@airportparking.lk | +94 76 141 4557';
 
     // logo optional
-    $logoPath = dirname(__DIR__, 2) . '/assets/img/logo.png';
+    $logoPath = dirname(__DIR__, 2) . '/assets/images/logo.png';    
     $logoDataUri = '';
+
     if (file_exists($logoPath)) {
         $logoType = pathinfo($logoPath, PATHINFO_EXTENSION);
         $logoData = file_get_contents($logoPath);
@@ -171,17 +172,71 @@ try {
             @page { size: A4 portrait; margin: 10mm; }
             body { font-family: DejaVu Sans, Arial, sans-serif; color: #1f2937; font-size: 12px; margin: 0; }
             .receipt { border: 1px solid #d1d5db; border-radius: 10px; overflow: hidden; }
-            .header { background: #0f172a; color: #fff; padding: 16px 18px; }
-            .header-table, .meta-wrap, .amount-panel, .section-table, .footer-table, .details { width: 100%; border-collapse: collapse; }
-            .header-table td, .meta-wrap td, .amount-panel td, .section-table td, .footer-table td { border: none; vertical-align: top; }
-            .logo-cell { width: 80px; }
-            .logo-box { width: 64px; height: 64px; background: #fff; border-radius: 8px; text-align: center; overflow: hidden; }
-            .logo-box img { width: 64px; height: 64px; object-fit: contain; }
-            .company-name { font-size: 22px; font-weight: bold; margin: 0 0 4px 0; }
-            .company-line { font-size: 11px; margin: 2px 0; color: #e5e7eb; }
-            .title-block { text-align: right; }
-            .receipt-title { font-size: 24px; font-weight: bold; margin: 0 0 6px 0; }
-            .receipt-sub { font-size: 11px; color: #d1d5db; }
+            .header {
+                background: #e5e3df;
+                border-bottom: 3px solid #0b0833;
+                padding: 18px 22px;
+            }
+
+            .header-table,
+            .meta-wrap,
+            .amount-panel,
+            .section-table,
+            .footer-table,
+            .details {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            .header-table td,
+            .meta-wrap td,
+            .amount-panel td,
+            .section-table td,
+            .footer-table td {
+                border: none;
+                vertical-align: middle;
+            }
+
+            .left-block {
+                width: 58%;
+            }
+
+            .right-block {
+                width: 42%;
+                text-align: right;
+            }
+
+            .logo-box {
+                margin-bottom: 6px;
+            }
+
+            .logo-box img {
+                width: 190px;
+                height: auto;
+            }
+
+            .company-line {
+                font-size: 11px;
+                color: #4b5563;
+                line-height: 1.5;
+                margin: 2px 0;
+            }
+
+            .receipt-title {
+                font-size: 28px;
+                font-weight: bold;
+                color: #0b0833;
+                letter-spacing: 1px;
+                margin: 0;
+                line-height: 1;
+                white-space: nowrap;
+            }
+
+            .receipt-sub {
+                font-size: 11px;
+                color: #6b7280;
+                margin-top: 6px;
+            }
             .body { padding: 14px 18px 16px; }
             .meta-wrap td { width: 25%; padding-right: 8px; }
             .meta-card { border: 1px solid #e5e7eb; background: #f8fafc; border-radius: 8px; padding: 10px; }
@@ -212,24 +267,43 @@ try {
     <body>
         <div class="receipt">
             <div class="header">
+
                 <table class="header-table">
                     <tr>
-                        <td class="logo-cell">
+
+                        <td class="left-block">
+
                             <?php if ($logoDataUri): ?>
-                                <div class="logo-box"><img src="<?= $logoDataUri ?>" alt="Logo"></div>
+                                <div class="logo-box">
+                                    <img src="<?= $logoDataUri ?>" alt="Logo">
+                                </div>
                             <?php endif; ?>
+
+                            <div class="company-line">
+                                <?= h($companyAddress) ?>
+                            </div>
+
+                            <div class="company-line">
+                                <?= h($companyContact) ?>
+                            </div>
+
                         </td>
-                        <td>
-                            <div class="company-name"><?= h($companyName) ?></div>
-                            <div class="company-line"><?= h($companyAddress) ?></div>
-                            <div class="company-line"><?= h($companyContact) ?></div>
+
+                        <td class="right-block">
+
+                            <div class="receipt-title">
+                                PAYMENT RECEIPT
+                            </div>
+
+                            <div class="receipt-sub">
+                                Official payment and transaction
+                            </div>
+
                         </td>
-                        <td class="title-block">
-                            <div class="receipt-title">PAYMENT RECEIPT</div>
-                            <div class="receipt-sub">Official payment confirmation</div>
-                        </td>
+
                     </tr>
                 </table>
+
             </div>
 
             <div class="body">
