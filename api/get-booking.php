@@ -23,11 +23,6 @@ if (!$reference) {
     api_error("Reference is required", null, 400);
 }
 
-// Validate format
-// if (!preg_match('/^G\d+-AP-\d+$/', $reference)) {
-//     api_error("Invalid reference format", null, 400);
-// }
-
 /*
 |--------------------------------------------------------------------------
 | Fetch booking details from database
@@ -40,10 +35,12 @@ try {
             vehicle_number,
             start_date,
             end_date,
+            end_date_edited,
             name,
             email,
             whatsapp_number,
             total_price,
+            total_price_final,
             booking_status
         FROM reserved_slots
         WHERE reference_number = ?
@@ -73,10 +70,12 @@ echo json_encode([
     "vehicle_number" => $booking['vehicle_number'],
     "start_date" => $booking['start_date'],
     "end_date" => $booking['end_date'],
+    "end_date_edited" => $booking['end_date_edited'],
     "name" => $booking['name'],
     "email" => $booking['email'],
     "whatsapp_number" => $booking['whatsapp_number'],
     "total_price" => $booking['total_price'],
+    "total_price_final" => $booking['total_price_final'],
     "booking_status" => $booking['booking_status']
 ]);
 

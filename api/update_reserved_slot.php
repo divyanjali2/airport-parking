@@ -66,16 +66,6 @@ try {
         ':reference_number' => $reference_number
     ]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | UPDATE reserved_slots TABLE
-    |--------------------------------------------------------------------------
-    | IMPORTANT:
-    | - DO NOT UPDATE end_date
-    | - ONLY UPDATE end_date_edited
-    |--------------------------------------------------------------------------
-    */
-
     $sql2 = "UPDATE reserved_slots
             SET
                 total_price_final = :total_price_final,
@@ -93,12 +83,6 @@ try {
         ':late_fee_amount' => $late_fee_amount,
         ':reference_number' => $reference_number
     ]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | COMMIT TRANSACTION
-    |--------------------------------------------------------------------------
-    */
 
     $conn->commit();
 
