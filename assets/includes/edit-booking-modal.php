@@ -233,52 +233,145 @@ if (!empty($b['images'])) {
             return isNaN(dt.getTime()) ? null : dt;
         }
 
-        function getSurchargePercent(lateMinutesAfterGrace) {
-            if (lateMinutesAfterGrace <= 0) return 0;
-            if (lateMinutesAfterGrace <= 120) return 25;
-            if (lateMinutesAfterGrace <= 240) return 50;
-            if (lateMinutesAfterGrace <= 360) return 75;
+        function getSurchargePercent(lateMinutes) {
+
+            const lateHours = lateMinutes / 60;
+
+            // 1 - 2 hours = Waived Off
+            if (lateHours <= 2) {
+                return 0;
+            }
+
+            // More than 2 hours up to 8 hours = 50%
+            if (lateHours <= 8) {
+                return 50;
+            }
+
+            // More than 8 hours = Full day charge
             return 100;
         }
 
         function recalcPricePreview() {
+
             const editedVal = $editedEndDate.val();
+
             const originalDb = $editedEndDate.attr('data-original-end');
 
             if (!editedVal || !originalDb) {
+
                 $updatedTotalPrice.val(baseTotalPrice.toFixed(2));
+
                 $lateFeeLabel.text('');
+
                 return;
             }
 
             const originalEnd = parseDbDate(originalDb);
+
             const editedEnd = new Date(editedVal);
 
-            if (!originalEnd || isNaN(originalEnd.getTime()) || isNaN(editedEnd.getTime())) {
+            if (
+                !originalEnd ||
+                isNaN(originalEnd.getTime()) ||
+                isNaN(editedEnd.getTime())
+            ) {
+
                 $updatedTotalPrice.val(baseTotalPrice.toFixed(2));
+
                 $lateFeeLabel.text('Invalid date format.');
+
                 return;
             }
 
-            const graceMs = 2 * 60 * 60 * 1000;
-            const graceEnd = new Date(originalEnd.getTime() + graceMs);
+            /*
+            |--------------------------------------------------------------------------
+            | CALCULATE LATE HOURS
+            |--------------------------------------------------------------------------
+            */
 
-            const diffMs = editedEnd.getTime() - graceEnd.getTime();
-            const lateMinutesAfterGrace = Math.ceil(diffMs / (60 * 1000));
+            const diffMs = editedEnd.getTime() - originalEnd.getTime();
 
-            const pct = getSurchargePercent(lateMinutesAfterGrace);
-            const lateFee = baseTotalPrice * (pct / 100);
-            const updated = baseTotalPrice + lateFee;
+            const lateMinutes = Math.ceil(diffMs / (60 * 1000));
 
-            $updatedTotalPrice.val(updated.toFixed(2));
+            let surchargePercent = 0;
 
-            if (pct === 0) {
-                $lateFeeLabel.text('Within grace period (0% surcharge).');
+            // Not late
+            if (lateMinutes <= 0) {
+
+                surchargePercent = 0;
+
             } else {
-                $lateFeeLabel.text(`Late surcharge: ${pct}% (LKR ${lateFee.toFixed(2)})`);
+
+                const lateHours = lateMinutes / 60;
+
+                // 1 - 2 hours = waived
+                if (lateHours <= 2) {
+
+                    surchargePercent = 0;
+
+                }
+
+                // 2 - 8 hours = 50%
+                else if (lateHours <= 8) {
+
+                    surchargePercent = 50;
+
+                }
+
+                // More than 8 hours = full day
+                else {
+
+                    surchargePercent = 100;
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | PRICE CALCULATION
+            |--------------------------------------------------------------------------
+            */
+
+            const lateFee = baseTotalPrice * (surchargePercent / 100);
+
+            const updatedPrice = baseTotalPrice + lateFee;
+
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE UI
+            |--------------------------------------------------------------------------
+            */
+
+            $updatedTotalPrice.val(updatedPrice.toFixed(2));
+
+            if (surchargePercent === 0) {
+
+                if (lateMinutes > 0) {
+
+                    $lateFeeLabel.text(
+                        '1 - 2 hours waived off.'
+                    );
+
+                } else {
+
+                    $lateFeeLabel.text(
+                        'No late charge.'
+                    );
+                }
+
+            } else if (surchargePercent === 50) {
+
+                $lateFeeLabel.text(
+                    `2 - 8 hours late charge: 50% (LKR ${lateFee.toFixed(2)})`
+                );
+
+            } else {
+
+                $lateFeeLabel.text(
+                    `More than 8 hours: Full day charge applied (LKR ${lateFee.toFixed(2)})`
+                );
             }
         }
-
+        
         $moveToTrash.off('change.editTrash').on('change.editTrash', function () {
             if (this.checked) {
                 $remarkRequired.removeClass('d-none');

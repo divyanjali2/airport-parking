@@ -6,30 +6,119 @@ require_once __DIR__ . '/../assets/includes/db_connect.php';
 
 $data = json_decode(file_get_contents("php://input"), true);
 
-$reference_number = $data['reference_number'] ?? '';
-$end_date = $data['end_date'] ?? '';
+/*
+|--------------------------------------------------------------------------
+| REQUEST DATA
+|--------------------------------------------------------------------------
+*/
 
-if (!$reference_number || !$end_date) {
+$reference_number  = $data['reference_number'] ?? '';
+$check_out_by_name = $data['check_out_by_name'] ?? '';
+
+$total_price_final = $data['total_price_final'] ?? 0;
+
+$end_date_edited   = $data['end_date_edited'] ?? '';
+
+$late_fee_amount   = $data['late_fee_amount'] ?? 0;
+
+/*
+|--------------------------------------------------------------------------
+| VALIDATION
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !$reference_number ||
+    !$check_out_by_name
+) {
+
     exit(json_encode([
         'status' => false,
-        'message' => 'reference_number and end_date are required'
+        'message' => 'reference_number and check_out_by_name are required'
     ]));
 }
 
-$sql = "UPDATE reserved_slots 
-        SET end_date = :end_date 
-        WHERE reference_number = :reference_number";
+try {
 
-$stmt = $conn->prepare($sql);
+    $conn->beginTransaction();
 
-$stmt->execute([
-    ':end_date' => $end_date,
-    ':reference_number' => $reference_number
-]);
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE customer_handling TABLE
+    |--------------------------------------------------------------------------
+    */
 
-echo json_encode([
-    'status' => $stmt->rowCount() > 0,
-    'message' => $stmt->rowCount() > 0
-        ? 'Updated successfully'
-        : 'No matching reference found'
-]);
+    $customer_status = 'check_out';
+
+    $sql1 = "UPDATE customer_handling
+            SET
+                check_out_datetime = NOW(),
+                check_out_by_name = :check_out_by_name,
+                status = :status,
+                updated_at = NOW()
+            WHERE reference_number = :reference_number";
+
+    $stmt1 = $conn->prepare($sql1);
+
+    $stmt1->execute([
+        ':check_out_by_name' => $check_out_by_name,
+        ':status' => $customer_status,
+        ':reference_number' => $reference_number
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE reserved_slots TABLE
+    |--------------------------------------------------------------------------
+    | IMPORTANT:
+    | - DO NOT UPDATE end_date
+    | - ONLY UPDATE end_date_edited
+    |--------------------------------------------------------------------------
+    */
+
+    $sql2 = "UPDATE reserved_slots
+            SET
+                total_price_final = :total_price_final,
+                end_date_edited = :end_date_edited,
+                vehicle_status = 'completed',
+                payment_status = 'Paid Fully',
+                late_fee_amount = :late_fee_amount
+            WHERE reference_number = :reference_number";
+
+    $stmt2 = $conn->prepare($sql2);
+
+    $stmt2->execute([
+        ':total_price_final' => $total_price_final,
+        ':end_date_edited' => $end_date_edited,
+        ':late_fee_amount' => $late_fee_amount,
+        ':reference_number' => $reference_number
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | COMMIT TRANSACTION
+    |--------------------------------------------------------------------------
+    */
+
+    $conn->commit();
+
+    echo json_encode([
+        'status' => true,
+        'customer_status' => $customer_status,
+        'vehicle_status' => 'completed',
+        'reference_number' => $reference_number,
+        'total_price_final' => $total_price_final,
+        'end_date_edited' => $end_date_edited,
+        'late_fee_amount' => $late_fee_amount,
+        'message' => 'Customer checked out successfully'
+    ]);
+
+} catch (Exception $e) {
+
+    $conn->rollBack();
+
+    echo json_encode([
+        'status' => false,
+        'message' => $e->getMessage()
+    ]);
+}

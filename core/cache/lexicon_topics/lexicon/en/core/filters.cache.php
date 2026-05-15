@@ -1,0 +1,18 @@
+<?php  return array (
+  'ago' => '[[+time]] ago',
+  'ago_day' => '[[+time]] day',
+  'ago_days' => '[[+time]] days',
+  'ago_hour' => '[[+time]] hour',
+  'ago_hours' => '[[+time]] hours',
+  'ago_minute' => '1 minute',
+  'ago_minutes' => '[[+time]] minutes',
+  'ago_month' => '[[+time]] month',
+  'ago_months' => '[[+time]] months',
+  'ago_seconds' => '[[+time]] sec',
+  'ago_week' => '[[+time]] week',
+  'ago_weeks' => '[[+time]] weeks',
+  'ago_year' => '[[+time]] year',
+  'ago_years' => '[[+time]] years',
+  'today_at' => 'today at [[+time]]',
+  'yesterday_at' => 'yesterday at [[+time]]',
+);

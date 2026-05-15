@@ -51,6 +51,14 @@
             </li>
         <?php endif; ?>
 
+        <?php if (in_array($role, ['staff', 'admin','finance'])): ?>
+            <li class="nav-item">
+                <a href="./customer_handling_list.php" class="nav-link text-white <?= $currentPage === 'customer_handling_list.php' ? 'active' : '' ?>" aria-current="page">
+                    <i class="bi bi-cash-stack me-2"></i> Customer Handling List
+                </a>
+            </li>
+        <?php endif; ?>
+
         <?php if (in_array($role, ['gm', 'admin'])): ?>
             <li class="nav-item">
                 <a href="./reservation-summary.php" class="nav-link text-white <?= $currentPage === 'reservation-summary.php' ? 'active' : '' ?>" aria-current="page">
@@ -90,6 +98,8 @@
                 </a>
             </li>
         <?php endif; ?>
+
+
 
         <!-- <?php if (in_array($role, ['finance', 'admin'])): ?>
             <li class="nav-item">

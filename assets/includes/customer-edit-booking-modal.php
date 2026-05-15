@@ -70,7 +70,7 @@ $finalTotalPrice = isset($b['total_price_final']) && $b['total_price_final'] !==
 
 .customer-edit-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 2fr;
     gap: 14px;
 }
 
@@ -83,6 +83,7 @@ $finalTotalPrice = isset($b['total_price_final']) && $b['total_price_final'] !==
     font-weight: bold;
     color: #003272;
     margin-bottom: 6px;
+    font-size: 12px;
 }
 
 .customer-edit-group input,
@@ -164,32 +165,39 @@ $finalTotalPrice = isset($b['total_price_final']) && $b['total_price_final'] !==
                 id="customer_edited_end_date"
                 value="<?= htmlspecialchars(toDatetimeLocal($editedEndDb ?: $originalEnd)) ?>"
             >
-            <small>Grace period: 2 hours after current end time.</small>
         </div>
 
         <div class="customer-edit-group price-box">
-            <label>Updated Total Price (LKR)</label>
-            <input
-                type="text"
-                id="customer_updated_total_price"
-                value="<?= number_format($finalTotalPrice, 2, '.', '') ?>"
-                readonly
-            >
-            <small id="customer_late_fee_label"></small>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+
+                <div>
+                    <label>Base Price (LKR)</label>
+                    <input type="text" value="<?= number_format($baseTotalPrice, 2, '.', '') ?>" readonly>
+                </div>
+
+                <div>
+                    <label>Late Fee (LKR)</label>
+                    <input type="text" id="customer_late_fee_amount" value="0.00" readonly>
+                </div>
+
+                <div style="grid-column: span 2;">
+                    <label>Updated Total Price (LKR)</label>
+                    <input type="text" id="customer_updated_total_price" value="<?= number_format($finalTotalPrice, 2, '.', '') ?>" readonly>
+                    <small id="customer_late_fee_label"></small>
+                </div>
+
+            </div>
+
         </div>
     </div>
 
     <div class="customer-edit-group">
         <label>Edit Reason</label>
-        <textarea id="customer_edit_reason" rows="3" placeholder="Enter reason for changing end date"></textarea>
+        <textarea id="customer_edit_reason" rows="3" placeholder="Enter reason for changing end date" required></textarea>
     </div>
 
-    <button
-        type="button"
-        class="customer-save-btn"
-        id="saveCustomerBookingEdit"
-        data-id="<?= (int)$b['id'] ?>"
-    >
+    <button type="button" class="customer-save-btn" id="saveCustomerBookingEdit" data-id="<?= (int)$b['id'] ?>" >
         Save Changes
     </button>
 </div>
@@ -197,50 +205,127 @@ $finalTotalPrice = isset($b['total_price_final']) && $b['total_price_final'] !==
 <script>
 (function () {
     const baseTotalPrice = <?= json_encode($baseTotalPrice) ?>;
-    const originalEndTs = <?= json_encode($originalEndTs ? $originalEndTs * 1000 : null) ?>;
+    const originalEndRaw = <?= json_encode($originalEnd ?? '') ?>;
+
+    const originalEndTs = new Date(
+        originalEndRaw.replace(/-/g, '/')
+    ).getTime();
 
     const $editedEnd = $("#customer_edited_end_date");
     const $updatedTotal = $("#customer_updated_total_price");
     const $lateLabel = $("#customer_late_fee_label");
+    const $lateFeeAmount = $("#customer_late_fee_amount");
+    function getSurchargePercent(lateMinutes) {
 
-    function getSurchargePercent(lateMinutesAfterGrace) {
-        if (lateMinutesAfterGrace <= 0) return 0;
-        if (lateMinutesAfterGrace <= 120) return 25;
-        if (lateMinutesAfterGrace <= 240) return 50;
-        if (lateMinutesAfterGrace <= 360) return 75;
+        const lateHours = lateMinutes / 60;
+
+        // Up to 2 hours = Free
+        if (lateHours <= 2) {
+            return 0;
+        }
+
+        // More than 2 hours up to 8 hours = 50%
+        if (lateHours <= 8) {
+            return 50;
+        }
+
+        // More than 8 hours = Full day charge
         return 100;
     }
 
     function recalcPricePreview() {
+
         if (!originalEndTs || !$editedEnd.val()) {
+
             $updatedTotal.val(baseTotalPrice.toFixed(2));
+
             $lateLabel.text("");
+
             return;
         }
 
-        const editedEndTs = new Date($editedEnd.val()).getTime();
+        const editedEndTs = new Date(
+            $editedEnd.val()
+        ).getTime();
 
         if (isNaN(editedEndTs)) {
+
             $updatedTotal.val(baseTotalPrice.toFixed(2));
-            $lateLabel.removeClass().addClass("text-warning").text("Invalid date format.");
+
+            $lateLabel
+                .removeClass()
+                .addClass("text-warning")
+                .text("Invalid date format.");
+
             return;
         }
 
-        const graceEndTs = originalEndTs + (2 * 60 * 60 * 1000);
-        const lateMinutesAfterGrace = Math.ceil((editedEndTs - graceEndTs) / 60000);
+        /*
+        |--------------------------------------------------------------------------
+        | CALCULATE LATE TIME
+        |--------------------------------------------------------------------------
+        */
 
-        const pct = getSurchargePercent(lateMinutesAfterGrace);
+        const diffMs = editedEndTs - originalEndTs;
+
+        const diffMinutes = Math.ceil(diffMs / 60000);
+
+        let pct = 0;
+
+        if (diffMinutes > 0) {
+            pct = getSurchargePercent(diffMinutes);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRICE CALCULATION
+        |--------------------------------------------------------------------------
+        */
+
         const lateFee = baseTotalPrice * (pct / 100);
-        const updated = baseTotalPrice + lateFee;
 
-        $updatedTotal.val(updated.toFixed(2));
+        const updatedTotal = baseTotalPrice + lateFee;
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE UI
+        |--------------------------------------------------------------------------
+        */
+
+        $lateFeeAmount.val(lateFee.toFixed(2));
+
+        $updatedTotal.val(updatedTotal.toFixed(2));
 
         if (pct === 0) {
-            $lateLabel.removeClass().addClass("text-success")
-                .text("Within grace period. No surcharge.");
+
+            if (diffMinutes > 0) {
+
+                $lateLabel
+                    .removeClass()
+                    .addClass("text-success")
+                    .text("Up to 2 hours waived off.");
+
+            } else {
+
+                $lateLabel
+                    .removeClass()
+                    .addClass("text-success")
+                    .text("No late charge.");
+            }
+
+        } else if (pct === 50) {
+
+            $lateLabel
+                .removeClass()
+                .addClass("text-warning")
+                .text(`2 to 8 hours late charge: 50% | Extra LKR ${lateFee.toFixed(2)}`);
+
         } else {
-            $lateLabel.removeClass().addClass("text-warning")
-                .text(`Late surcharge: ${pct}% | Extra LKR ${lateFee.toFixed(2)}`);
+
+            $lateLabel
+                .removeClass()
+                .addClass("text-danger")
+                .text(`More than 8 hours: Full day charge | Extra LKR ${lateFee.toFixed(2)}`);
         }
     }
 

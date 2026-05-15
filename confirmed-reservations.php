@@ -195,6 +195,15 @@ try {
                                                 <a href="<?= $waLink ?>" target="_blank" class="btn btn-sm btn-outline-success">
                                                     <i class="bi bi-whatsapp"></i>
                                                 </a>
+
+                                                                                            <button 
+                                                type="button" 
+                                                class="btn btn-sm btn-danger no-show-btn" 
+                                                data-id="<?= $b['id'] ?>" 
+                                                data-reference="<?= htmlspecialchars($b['reference_number']) ?>" 
+                                                title="Mark as No Show">
+                                                <i class="bi bi-person-x"></i>
+                                            </button>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -296,6 +305,38 @@ try {
                     </div>
                 </div>
             </div>
+
+            <div class="modal fade" id="noShowModal" tabindex="-1" aria-labelledby="noShowModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form id="noShowForm">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="noShowModalLabel">Mark as No Show</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" id="no_show_booking_id">
+
+                                <div class="mb-3">
+                                    <label class="form-label">Reference No</label>
+                                    <input type="text" id="no_show_reference" class="form-control" readonly>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="no_show_reason" class="form-label">Reason <span class="text-danger">*</span></label>
+                                    <textarea id="no_show_reason" class="form-control" rows="4" placeholder="Enter reason" required></textarea>
+                                </div>
+
+                                <p class="mb-0 text-danger">This booking will be marked as no show and hidden from the active list.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-danger">Yes, Mark No Show</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -307,6 +348,53 @@ try {
     <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+
+
+    <script>
+        $(document).on('click', '.no-show-btn', function () {
+            $('#no_show_booking_id').val($(this).data('id'));
+            $('#no_show_reference').val($(this).data('reference'));
+            $('#no_show_reason').val('');
+
+            bootstrap.Modal.getOrCreateInstance(
+                document.getElementById('noShowModal')
+            ).show();
+        });
+
+        $(document).on('submit', '#noShowForm', function (e) {
+            e.preventDefault();
+
+            const id = $('#no_show_booking_id').val();
+            const reason = $('#no_show_reason').val().trim();
+
+            if (!reason) {
+                alert('Please enter a reason.');
+                $('#no_show_reason').focus();
+                return;
+            }
+
+            $.ajax({
+                url: 'assets/includes/mark-no-show.php',
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    id: id,
+                    reason: reason
+                },
+                success: function (res) {
+                    if (res.success) {
+                        bootstrap.Modal.getInstance(document.getElementById('noShowModal')).hide();
+                        location.reload();
+                    } else {
+                        alert(res.message || 'Failed to mark as no show.');
+                    }
+                },
+                error: function () {
+                    alert('Server error while marking as no show.');
+                }
+            });
+        });
+    </script>
 
     <script>
         $(document).ready(function() {
