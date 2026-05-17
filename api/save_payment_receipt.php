@@ -1,14 +1,18 @@
 <?php
+
 require_once __DIR__ . '/../assets/includes/db_connect.php';
 
 header('Content-Type: application/json');
 
-function api_error($message, $code = 400) {
+function api_error($message, $code = 400)
+{
     http_response_code($code);
+
     echo json_encode([
         "status" => "error",
         "message" => $message
     ]);
+
     exit;
 }
 
@@ -24,53 +28,104 @@ if (!isset($_FILES['pdf'])) {
 }
 
 try {
-    // Get reserved slot data
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fetch booking details
+    |--------------------------------------------------------------------------
+    */
+
     $stmt = $conn->prepare("
         SELECT *
         FROM reserved_slots
         WHERE reference_number = ?
         LIMIT 1
     ");
+
     $stmt->execute([$reference]);
+
     $booking = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$booking) {
         api_error("Booking not found", 404);
     }
 
-    // Main folder
-    $baseDir = "https://airportparking.lk/payment-receipts";
+    /*
+    |--------------------------------------------------------------------------
+    | Create receipt folder
+    |--------------------------------------------------------------------------
+    */
 
-    // Folder using reference number
-    $receiptFolder = $baseDir . "/" . $reference;
+    // REAL SERVER PATH (IMPORTANT)
+    $baseDir = __DIR__ . '/../payment-receipts';
+
+    // Create main folder if not exists
+    if (!is_dir($baseDir)) {
+        if (!mkdir($baseDir, 0777, true)) {
+            api_error("Failed to create payment-receipts directory", 500);
+        }
+    }
+
+    // Create booking folder
+    $receiptFolder = $baseDir . '/' . $reference;
 
     if (!is_dir($receiptFolder)) {
-        mkdir($receiptFolder, 0777, true);
+        if (!mkdir($receiptFolder, 0777, true)) {
+            api_error("Failed to create receipt folder", 500);
+        }
     }
 
-    // Receipt file name
+    /*
+    |--------------------------------------------------------------------------
+    | Generate receipt filename
+    |--------------------------------------------------------------------------
+    */
+
     $receiptNo = "REC-" . $reference . "-" . date("YmdHis");
+
     $fileName = $receiptNo . ".pdf";
 
-    $fullPath = $receiptFolder . "/" . $fileName;
+    $fullPath = $receiptFolder . '/' . $fileName;
 
-    // Path to save in database
+    // Path saved to database
     $dbPath = "payment-receipts/" . $reference . "/" . $fileName;
 
-    // Save uploaded PDF
+    /*
+    |--------------------------------------------------------------------------
+    | Save uploaded PDF
+    |--------------------------------------------------------------------------
+    */
+
     if (!move_uploaded_file($_FILES['pdf']['tmp_name'], $fullPath)) {
-        api_error("Failed to save PDF file", 500);
+
+        $uploadError = $_FILES['pdf']['error'] ?? 'Unknown';
+
+        api_error("Failed to save PDF file. Upload error code: " . $uploadError, 500);
     }
 
-    // Duration example
+    /*
+    |--------------------------------------------------------------------------
+    | Calculate expected duration
+    |--------------------------------------------------------------------------
+    */
+
     $expectedDuration = null;
+
     if (!empty($booking['start_date']) && !empty($booking['end_date'])) {
+
         $start = new DateTime($booking['start_date']);
+
         $end = new DateTime($booking['end_date']);
+
         $expectedDuration = $start->diff($end)->format('%a days');
     }
 
-    // Insert payment receipt
+    /*
+    |--------------------------------------------------------------------------
+    | Insert receipt record
+    |--------------------------------------------------------------------------
+    */
+
     $insert = $conn->prepare("
         INSERT INTO payment_receipts (
             reserved_slot_id,
@@ -108,13 +163,21 @@ try {
         $booking['real_arrived_at'] ?? null
     ]);
 
+    /*
+    |--------------------------------------------------------------------------
+    | Success response
+    |--------------------------------------------------------------------------
+    */
+
     echo json_encode([
         "status" => "success",
         "message" => "Payment receipt saved successfully",
         "receipt_no" => $receiptNo,
-        "receipt_path" => $dbPath
+        "receipt_path" => $dbPath,
+        "file_url" => "https://airportparking.lk/" . $dbPath
     ]);
 
 } catch (Exception $e) {
+
     api_error($e->getMessage(), 500);
 }
