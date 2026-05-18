@@ -7,67 +7,67 @@
         exit;
     }
 
-try {
-    $stmt = $conn->query("
-        SELECT
-            rs.id,
-            rs.reference_number,
-            rs.slot_number,
-            rs.vehicle_type,
-            rs.flight_number,
-            rs.start_date,
-            rs.end_date,
-            rs.total_price,
-            rs.pdf_path,
-            rs.name AS customer_name,
-            rs.email,
-            rs.booking_type,
-            rs.whatsapp_number,
-            rs.total_price_final,
-            rs.booking_status,
+    try {
+        $stmt = $conn->query("
+            SELECT
+                rs.id,
+                rs.reference_number,
+                rs.slot_number,
+                rs.vehicle_type,
+                rs.flight_number,
+                rs.start_date,
+                rs.end_date,
+                rs.total_price,
+                rs.pdf_path,
+                rs.name AS customer_name,
+                rs.email,
+                rs.booking_type,
+                rs.whatsapp_number,
+                rs.total_price_final,
+                rs.booking_status,
 
-            pr.receipt_path
+                pr.receipt_path
 
-        FROM reserved_slots rs
+            FROM reserved_slots rs
 
-        LEFT JOIN payment_receipts pr
-            ON pr.reserved_slot_id = rs.id
+            LEFT JOIN payment_receipts pr
+                ON pr.reserved_slot_id = rs.id
 
-        WHERE rs.is_trashed = 0
-        AND rs.is_no_show = 0
-        AND rs.cash_handover = 0
-        AND rs.booking_status = 'confirmed'
+            WHERE rs.is_trashed = 0
+            AND rs.is_no_show = 0
+            AND rs.cash_handover = 0
+            AND rs.booking_status = 'confirmed'
 
-        ORDER BY rs.created_at DESC
-    ");
+            ORDER BY rs.created_at DESC
+        ");
 
-    $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-} catch (PDOException $e) {
-    die('<div style="color:red;">Database error: ' . $e->getMessage() . '</div>');
-}
+    } catch (PDOException $e) {
+        die('<div style="color:red;">Database error: ' . $e->getMessage() . '</div>');
+    }
 
-try {
-    $stmtCash = $conn->query("
-        SELECT
-            id,
-            reference_number,
-            name,
-            total_price_final
-        FROM reserved_slots
-        WHERE payment_status = 'Paid Fully'
-        AND cash_handover = 0
-        AND booking_status = 'confirmed'
-        AND is_trashed = 0
-        AND is_no_show = 0
-        ORDER BY created_at DESC
-    ");
+    try {
+        $stmtCash = $conn->query("
+            SELECT
+                id,
+                reference_number,
+                name,
+                total_price_final
+            FROM reserved_slots
+            WHERE payment_status = 'Paid Fully'
+            AND cash_handover = 0
+            AND booking_status = 'confirmed'
+            AND is_trashed = 0
+            AND is_no_show = 0
+            ORDER BY created_at DESC
+        ");
 
-    $cashHandoverBookings = $stmtCash->fetchAll(PDO::FETCH_ASSOC);
+        $cashHandoverBookings = $stmtCash->fetchAll(PDO::FETCH_ASSOC);
 
-} catch (PDOException $e) {
-    die('<div style="color:red;">Database error (cash handover): ' . $e->getMessage() . '</div>');
-}
+    } catch (PDOException $e) {
+        die('<div style="color:red;">Database error (cash handover): ' . $e->getMessage() . '</div>');
+    }
 ?>
 
 <!DOCTYPE html>
