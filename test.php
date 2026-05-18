@@ -701,236 +701,269 @@
         });
     </script>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const slots = Array.from(document.querySelectorAll('#reserve-slots .slot'));
-            const modal = document.getElementById('booking-modal');
-            const closeModal = modal.querySelector('.close');
-            const bookingForm = document.getElementById('booking-form');
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const slots = Array.from(document.querySelectorAll('#reserve-slots .slot'));
+    const modal = document.getElementById('booking-modal');
+    const closeModal = modal.querySelector('.close');
+    const bookingForm = document.getElementById('booking-form');
 
-            const slotInput = document.getElementById('slot-number');
-            const vehicleTypeInput = document.getElementById('vehicle-type');
-            const hometownInput = document.getElementById('hometown');
+    const slotInput = document.getElementById('slot-number');
+    const startDateInput = document.getElementById('start-date');
+    const endDateInput = document.getElementById('end-date');
 
-            const startDateInput = document.getElementById('start-date');
-            const endDateInput = document.getElementById('end-date');
+    const totalDaysText = document.getElementById('total-days-text');
+    const totalPriceText = document.getElementById('total-price-text');
 
-            const totalDaysText = document.getElementById('total-days-text');
-            const totalPriceText = document.getElementById('total-price-text');
+    const extraServices = document.querySelectorAll('.extra-service');
 
-            const extraServices = document.querySelectorAll('.extra-service');
+    const PRICE_PER_DAY = 1000;
 
-            const PRICE_PER_DAY = 1000;
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localISO = new Date(now - tzOffset).toISOString().slice(0, 16);
 
-            const now = new Date();
-            const tzOffset = now.getTimezoneOffset() * 60000; 
-            const localISO = new Date(now - tzOffset).toISOString().slice(0,16); 
+    startDateInput.min = localISO;
+    endDateInput.min = localISO;
 
-            startDateInput.min = localISO;
-            endDateInput.min = localISO;
+function getBookingPrice() {
 
-            function calculateTotal() {
-                if (!startDateInput.value || !endDateInput.value) {
-                    totalDaysText.textContent = '0 days 0 hours';
-                    totalPriceText.textContent = '0.00';
-                    return;
-                }
+    const startValue = startDateInput.value;
+    const endValue = endDateInput.value;
 
-                const start = new Date(startDateInput.value);
-                const end = new Date(endDateInput.value);
+    if (!startValue || !endValue) {
+        return {
+            chargedDays: 0,
+            totalPrice: 0
+        };
+    }
 
-                if (end <= start) {
-                    totalDaysText.textContent = '0 days 0 hours';
-                    totalPriceText.textContent = '0.00';
-                    return;
-                }
+    const startDate = new Date(startValue);
+    const endDate = new Date(endValue);
 
-                // Difference in milliseconds
-                const diffMs = end - start;
+    if (endDate <= startDate) {
+        return {
+            chargedDays: 0,
+            totalPrice: 0
+        };
+    }
 
-                // Total hours
-                const totalHours = diffMs / (1000 * 60 * 60);
+    const diffMs = endDate.getTime() - startDate.getTime();
 
-                // Calculate full days and remaining hours
-                const fullDays = Math.floor(totalHours / 24);
-                const remainingHours = Math.round(totalHours % 24);
+    const totalHours = diffMs / (1000 * 60 * 60);
 
-                // Total days as float for pricing
-                const totalDaysFloat = totalHours / 24;
+    console.log("TOTAL HOURS:", totalHours);
 
-                // Price: multiply by PRICE_PER_DAY proportionally
-                let total = totalDaysFloat * PRICE_PER_DAY;
+    let fullDays = Math.floor(totalHours / 24);
 
-                // Add extra services
-                extraServices.forEach(service => {
-                    if (service.checked) {
-                        total += parseInt(service.value, 10);
-                    }
+    let extraHours = totalHours % 24;
+
+    console.log("FULL DAYS:", fullDays);
+    console.log("EXTRA HOURS:", extraHours);
+
+    let chargedDays = fullDays;
+
+    if (extraHours > 0 && extraHours <= 2) {
+        chargedDays += 0;
+    }
+    else if (extraHours > 2 && extraHours <= 8) {
+        chargedDays += 0.5;
+    }
+    else if (extraHours > 8) {
+        chargedDays += 1;
+    }
+
+    if (chargedDays < 1) {
+        chargedDays = 1;
+    }
+
+    let extraServicePrice = 0;
+
+    extraServices.forEach(service => {
+        if (service.checked) {
+            extraServicePrice += Number(service.value);
+        }
+    });
+
+    const totalPrice = chargedDays * PRICE_PER_DAY + extraServicePrice;
+
+    console.log("CHARGED DAYS:", chargedDays);
+    console.log("TOTAL PRICE:", totalPrice);
+
+    return {
+        chargedDays,
+        totalPrice
+    };
+}
+
+    function calculatePrice() {
+        const bookingPrice = getBookingPrice();
+
+        totalDaysText.textContent = bookingPrice.chargedDays;
+        totalPriceText.textContent = bookingPrice.totalPrice.toLocaleString();
+    }
+
+    startDateInput.addEventListener('change', calculatePrice);
+    endDateInput.addEventListener('change', calculatePrice);
+
+    extraServices.forEach(service => {
+        service.addEventListener('change', calculatePrice);
+    });
+
+    slots.forEach(slot => {
+        slot.addEventListener('click', () => {
+            if (slot.classList.contains('booked') || slot.disabled) return;
+
+            bookingForm.reset();
+
+            slotInput.value = slot.dataset.slot;
+            totalDaysText.textContent = '0';
+            totalPriceText.textContent = '0';
+
+            modal.style.display = 'block';
+        });
+    });
+
+    closeModal.addEventListener('click', () => {
+        modal.style.display = 'none';
+        bookingForm.reset();
+    });
+
+    window.addEventListener('click', e => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+            bookingForm.reset();
+        }
+    });
+
+    bookingForm.addEventListener('submit', e => {
+        e.preventDefault();
+
+        const submitBtn = document.getElementById('submit-booking-btn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Reserving...';
+
+        const bookingPrice = getBookingPrice();
+
+        if (bookingPrice.totalPrice <= 0) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Reserve Now';
+
+            Swal.fire({
+                icon: 'error',
+                title: 'Invalid Date',
+                text: 'Please select a valid start and end date.'
+            });
+
+            return;
+        }
+
+        const airTicketFile = document.getElementById('air_ticket_image_url').files[0];
+        const passportFile = document.getElementById('passport_copy_image_url').files[0];
+
+        const payload = {
+            slot: slotInput.value,
+            vehicleType: document.getElementById('vehicle-type').value,
+            hometown: document.getElementById('hometown').value,
+            startDate: startDateInput.value,
+            endDate: endDateInput.value,
+
+            days: bookingPrice.chargedDays,
+            pricePerDay: PRICE_PER_DAY,
+            totalPrice: Math.round(bookingPrice.totalPrice),
+
+            extras: Array.from(document.querySelectorAll('.extra-service:checked'))
+                .map(e => e.dataset.name),
+
+            flightNumber: document.getElementById('flight-number').value,
+            vehicleNumber: document.getElementById('vehicle_number').value,
+            whatsapp: document.getElementById('whatsapp-number').value,
+            passenger_count: document.getElementById('passenger_count').value,
+            name: document.getElementById('user-name').value,
+            email: document.getElementById('user-email').value
+        };
+
+        const formData = new FormData();
+
+        Object.keys(payload).forEach(key => {
+            if (Array.isArray(payload[key])) {
+                payload[key].forEach(val => formData.append(`${key}[]`, val));
+            } else {
+                formData.append(key, payload[key]);
+            }
+        });
+
+        formData.append('air_ticket_image_url', airTicketFile);
+        formData.append('passport_copy_image_url', passportFile);
+
+        console.log('========== BOOKING DEBUG ==========');
+        console.log(payload);
+
+        for (const [key, value] of formData.entries()) {
+            console.log(key, value);
+        }
+
+        console.log('===================================');
+
+        fetch('assets/includes/save-booking.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.text())
+        .then(text => {
+            console.log('RAW RESPONSE:', text);
+            return JSON.parse(text);
+        })
+        .then(response => {
+            if (!response.success) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Reserve Now';
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Booking Failed',
+                    text: response.detail || response.error || response.message || 'Unknown error'
                 });
 
-                // Update display
-                totalDaysText.textContent = `${fullDays} day${fullDays !== 1 ? 's' : ''} ${remainingHours} hour${remainingHours !== 1 ? 's' : ''}`;
-                const roundedTotal = Math.round(total);
-                totalPriceText.textContent = `${roundedTotal.toLocaleString()}`;
+                return;
             }
 
-            startDateInput.addEventListener('change', () => {
-                endDateInput.min = startDateInput.value;
-                calculateTotal();
+            Swal.fire({
+                icon: 'success',
+                title: 'Booking Successful',
+                html: `
+                    Slot <strong>${payload.slot}</strong> reserved.<br>
+                    Reference: <strong>${response.reference}</strong>
+                `
+            }).then(() => {
+                window.open(response.pdf_url, '_blank', 'noopener,noreferrer');
+                setTimeout(() => window.location.reload(), 1000);
             });
 
-            endDateInput.addEventListener('change', calculateTotal);
+            const slotElement = slots.find(s => s.dataset.slot === payload.slot);
 
-            extraServices.forEach(service => {
-                service.addEventListener('change', calculateTotal);
+            if (slotElement) {
+                slotElement.classList.add('booked');
+            }
+
+            modal.style.display = 'none';
+            bookingForm.reset();
+        })
+        .catch(error => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Reserve Now';
+
+            Swal.fire({
+                icon: 'error',
+                title: 'Server Error',
+                text: error.message
             });
 
-            /* Slot click */
-            slots.forEach(slot => {
-                slot.addEventListener('click', () => {
-                    if (slot.classList.contains('booked') || slot.disabled) return;
-
-                    bookingForm.reset();
-                    slotInput.value = slot.dataset.slot;
-                    totalDaysText.textContent = '0';
-                    totalPriceText.textContent = '0';
-
-                    modal.style.display = 'block';
-                });
-            });
-
-            /*  Close modal */
-            closeModal.addEventListener('click', () => {
-                modal.style.display = 'none';
-                bookingForm.reset();
-            });
-
-            window.addEventListener('click', e => {
-                if (e.target === modal) {
-                modal.style.display = 'none';
-                bookingForm.reset();
-                }
-            });
-
-            bookingForm.addEventListener('submit', e => {
-                e.preventDefault();
-
-                const submitBtn = document.getElementById('submit-booking-btn');
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Reserving...';
-
-                // Calculate exact total hours for fractional days
-                const start = new Date(startDateInput.value);
-                const end = new Date(endDateInput.value);
-                const totalHours = (end - start) / (1000 * 60 * 60); // total hours
-                const totalDaysFloat = totalHours / 24;
-
-                // Calculate total price including extra services
-                let totalPrice = totalDaysFloat * PRICE_PER_DAY;
-                extraServices.forEach(service => {
-                    if (service.checked) totalPrice += parseInt(service.value, 10);
-                });
-
-                const payload = {
-                    slot: slotInput.value,
-                    vehicleType: document.getElementById('vehicle-type').value,
-                    hometown: document.getElementById('hometown').value,
-                    startDate: startDateInput.value,
-                    endDate: endDateInput.value,
-                    days: totalDaysFloat.toFixed(2),      
-                    pricePerDay: PRICE_PER_DAY,
-                    totalPrice: Math.round(totalPrice),
-                    extras: Array.from(document.querySelectorAll('.extra-service:checked'))
-                        .map(e => e.dataset.name),
-                    flightNumber: document.getElementById('flight-number').value,
-                    vehicleNumber: document.getElementById('vehicle_number').value,
-                    whatsapp: document.getElementById('whatsapp-number').value,
-                    passenger_count: document.getElementById('passenger_count').value,
-                    name: document.getElementById('user-name').value,
-                    email: document.getElementById('user-email').value
-                };
-
-                const formData = new FormData();
-
-                Object.keys(payload).forEach(key => {
-                    if (Array.isArray(payload[key])) {
-                        payload[key].forEach(val => formData.append(`${key}[]`, val));
-                    } else {
-                        formData.append(key, payload[key]);
-                    }
-                });
-
-                // Append images
-                formData.append('air_ticket_image_url', document.getElementById('air_ticket_image_url').files[0]);
-                formData.append('passport_copy_image_url', document.getElementById('passport_copy_image_url').files[0]);
-                console.log('========== BOOKING DEBUG ==========');
-                console.log('slotInput.value:', slotInput.value);
-                console.log('vehicleType:', payload.vehicleType);
-                console.log('startDate:', payload.startDate);
-                console.log('endDate:', payload.endDate);
-
-                console.log('---- Payload Object ----');
-                console.log(payload);
-
-                console.log('---- FormData Contents ----');
-                for (const [key, value] of formData.entries()) {
-                    console.log(key, value);
-                }
-                console.log('===================================');
-
-                                fetch('assets/includes/save-booking.php', {
-                                    method: 'POST',
-                                    body: formData
-                                })
-                .then(res => res.text())
-                .then(t => { console.log("RAW RESPONSE:", t); return JSON.parse(t); })
-                                .then(response => {
-                                    if (!response.success) {
-                                        submitBtn.disabled = false;
-                                        submitBtn.textContent = 'Reserve Now';
-
-                                        Swal.fire({
-                                            icon: 'error',
-                                            title: 'Booking Failed',
-                                            //text: response.message || 'Unknown error',
-                text: response.detail || response.error || 'Unknown error'
-
-                        });
-                        return;
-                    }
-
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Booking Successful',
-                        html: `
-                            Slot <strong>${payload.slot}</strong> reserved.<br>
-                            Reference: <strong>${response.reference}</strong>
-                        `
-                    }).then(() => {
-                        window.open(response.pdf_url, '_blank', 'noopener,noreferrer');
-                        setTimeout(() => window.location.reload(), 1000);
-                    });
-
-                    const slotElement = slots.find(s => s.dataset.slot === payload.slot);
-                    if (slotElement) slotElement.classList.add('booked');
-
-                    modal.style.display = 'none';
-                    bookingForm.reset();
-                })
-                .catch(error => {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Reserve Now';
-
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Server Error',
-                        text: error.message,
-                    });
-                    console.error(error);
-                });
-            });
+            console.error(error);
         });
-    </script>
+    });
+});
+</script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {

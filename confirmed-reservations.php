@@ -10,27 +10,35 @@
 try {
     $stmt = $conn->query("
         SELECT
-            id,
-            reference_number,
-            slot_number,
-            vehicle_type,
-            flight_number,
-            start_date,
-            end_date,
-            total_price,
-            pdf_path,
-            name AS customer_name,
-            email,
-            booking_type,
-            whatsapp_number,
-            total_price_final,
-            booking_status
-        FROM reserved_slots
-        WHERE is_trashed = 0
-        AND is_no_show = 0
-        AND cash_handover = 0
-        AND booking_status = 'confirmed'
-        ORDER BY created_at DESC
+            rs.id,
+            rs.reference_number,
+            rs.slot_number,
+            rs.vehicle_type,
+            rs.flight_number,
+            rs.start_date,
+            rs.end_date,
+            rs.total_price,
+            rs.pdf_path,
+            rs.name AS customer_name,
+            rs.email,
+            rs.booking_type,
+            rs.whatsapp_number,
+            rs.total_price_final,
+            rs.booking_status,
+
+            pr.receipt_path
+
+        FROM reserved_slots rs
+
+        LEFT JOIN payment_receipts pr
+            ON pr.reserved_slot_id = rs.id
+
+        WHERE rs.is_trashed = 0
+        AND rs.is_no_show = 0
+        AND rs.cash_handover = 0
+        AND rs.booking_status = 'confirmed'
+
+        ORDER BY rs.created_at DESC
     ");
 
     $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -173,12 +181,36 @@ try {
                                         </td>
                                                                
                                         <td class="d-flex gap-1">
-                                            <button
-                                                class="btn btn-sm btn-outline-primary payment-receipt-btn"
-                                                data-id="<?= $b['id'] ?>"
-                                            >
-                                                Receipt
-                                            </button>
+                                            <?php if (!empty($b['receipt_path'])): ?>
+
+                                                <?php
+                                                    $receiptPath = str_replace('\\', '/', $b['receipt_path']);
+
+                                                    $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT']);
+
+                                                    if (strpos($receiptPath, $docRoot) === 0) {
+                                                        $receiptPath = substr($receiptPath, strlen($docRoot));
+                                                    }
+                                                ?>
+
+                                                <a
+                                                    href="<?= htmlspecialchars($receiptPath) ?>"
+                                                    target="_blank"
+                                                    class="btn btn-sm btn-outline-primary"
+                                                >
+                                                    View Receipt
+                                                </a>
+
+                                            <?php else: ?>
+
+                                                <button
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    disabled
+                                                >
+                                                    View Receipt
+                                                </button>
+
+                                            <?php endif; ?>
 
                                             <!-- Edit button -->
                                             <button class="btn btn-sm btn-outline-success edit-booking" data-id="<?= $b['id'] ?>">Edit</button>
