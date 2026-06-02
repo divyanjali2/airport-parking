@@ -15,26 +15,55 @@ try {
             rs.handover_by,
             u.name AS handover_by_name,
             COUNT(*) AS booking_count,
-            SUM(COALESCE(rs.total_price_final, rs.total_price, 0)) AS total_amount,
+
+            SUM(
+                CASE
+                    WHEN LOWER(TRIM(ch.status)) = 'check_in'
+                        THEN COALESCE(rs.total_price_final, rs.total_price, 0)
+
+                    WHEN LOWER(TRIM(ch.status)) = 'check_out'
+                         AND ROUND(COALESCE(rs.total_price_final, 0), 2) != ROUND(COALESCE(rs.total_price, 0), 2)
+                        THEN COALESCE(rs.total_price_final, 0) - COALESCE(rs.total_price, 0)
+
+                    ELSE 0
+                END
+            ) AS total_amount,
+
             GROUP_CONCAT(rs.reference_number ORDER BY rs.reference_number SEPARATOR ', ') AS reference_numbers
+
         FROM reserved_slots rs
-        LEFT JOIN users u ON u.id = rs.handover_by
+
+        INNER JOIN customer_handling ch
+            ON TRIM(ch.reference_number) = TRIM(rs.reference_number)
+
+        LEFT JOIN users u 
+            ON u.id = rs.handover_by
+
         WHERE rs.is_trashed = 0
         AND rs.is_no_show = 0
         AND rs.cash_handover = 1
         AND rs.booking_status = 'confirmed'
         AND (rs.cash_received_status IS NULL OR rs.cash_received_status = 'pending')
+        AND (
+            LOWER(TRIM(ch.status)) = 'check_in'
+            OR (
+                LOWER(TRIM(ch.status)) = 'check_out'
+                AND ROUND(COALESCE(rs.total_price_final, 0), 2) != ROUND(COALESCE(rs.total_price, 0), 2)
+            )
+        )
+
         GROUP BY 
             rs.handover_batch,
             rs.handover_datetime,
             rs.handover_by,
             u.name
+
         ORDER BY rs.handover_datetime DESC
     ");
 
     $handovers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $stmtAccepted = $conn->query("
+$stmtAccepted = $conn->query("
         SELECT
             rs.handover_batch,
             rs.handover_datetime,
@@ -71,29 +100,46 @@ try {
     die('<div style="color:red;">Database error: ' . $e->getMessage() . '</div>');
 }
 
+$cashHandovers = [];
+
 try {
-    $stmtCash = $conn->query("
-        SELECT
-            id,
-            reference_number,
-            name,
-            start_date,
-            end_date,
-            total_price_final
-        FROM reserved_slots
-        WHERE payment_status = 'Paid Fully'
-        AND cash_handover = 0
-        AND booking_status = 'confirmed'
-        AND is_trashed = 0
-        AND is_no_show = 0
-        ORDER BY created_at DESC
-    ");
+    $sql = "
+        SELECT ch.reference_number, ch.check_in_datetime, ch.check_in_by_name,
+               ch.check_out_datetime, ch.check_out_by_name, ch.status,
+               rs.name, rs.whatsapp_number, 
+               CASE
+                   WHEN ch.status = 'check_out'
+                    AND rs.total_price_final IS NOT NULL
+                    AND rs.total_price_final != rs.total_price
+                   THEN rs.total_price_final - rs.total_price
+                   ELSE rs.total_price
+               END AS cash_collected
+        FROM customer_handling ch
+        INNER JOIN reserved_slots rs ON rs.reference_number = ch.reference_number
+        WHERE (
+                ch.status = 'check_in'
+                OR (
+                    ch.status = 'check_out'
+                    AND rs.total_price_final IS NOT NULL
+                    AND rs.total_price_final != rs.total_price
+                )
+              )
+          AND rs.is_trashed = 0
+          AND rs.is_no_show = 0
+          AND rs.booking_status = 'confirmed'
+          AND rs.cash_handover = 0
+        ORDER BY ch.created_at DESC
+    ";
 
-    $cashHandoverBookings = $stmtCash->fetchAll(PDO::FETCH_ASSOC);
+    $cashHandovers = $conn->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
-} catch (PDOException $e) {
-    die('<div style="color:red;">Database error (cash handover): ' . $e->getMessage() . '</div>');
+} catch (Exception $e) {
+    die('<div style="color:red;">Database error: ' . $e->getMessage() . '</div>');
 }
+
+$totalPendingCash = array_sum(array_column($cashHandovers, 'cash_collected'));
+
+
 ?>
 
 <!DOCTYPE html>
@@ -115,6 +161,7 @@ try {
         table thead tr th { background:#000 !important; color:#fff !important; }
     </style>
 </head>
+
 <body>
 <div class="d-flex">
 
@@ -126,47 +173,54 @@ try {
 
                 <h4 class="fw-bold mt-2">Cash Handover Pending</h4>
 
-                <div class="table-responsive">
+               <div class="table-responsive">
                     <table class="table table-bordered table-striped align-middle" id="cashHandoverTable">
                         <thead class="table-dark">
                             <tr>
+                                <th>#</th>
                                 <th>Reference No</th>
                                 <th>Customer</th>
-                                <th>Start Date</th>
-                                <th>End Date</th>
-                                <th class="text-end">Amount (LKR)</th>
+                                <th>WhatsApp</th>
+                                <th>Check In</th>
+                                <th>Check In By</th>
+                                <th>Check Out</th>
+                                <th>Check Out By</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
 
                         <tbody>
-                            <?php foreach ($cashHandoverBookings as $c): ?>
+                            <?php foreach ($cashHandovers as $i => $row): ?>
                                 <tr>
+                                    <td><?= $i + 1 ?></td>
+                                    <td><?= htmlspecialchars($row['reference_number'] ?? '-') ?></td>
+                                    <td><?= htmlspecialchars($row['name'] ?? '-') ?></td>
+                                    <td><?= htmlspecialchars($row['whatsapp_number'] ?? '-') ?></td>
+                                    <td><?= htmlspecialchars($row['check_in_datetime'] ?? '-') ?></td>
+                                    <td><?= htmlspecialchars($row['check_in_by_name'] ?? '-') ?></td>
+                                    <td><?= htmlspecialchars($row['check_out_datetime'] ?: '-') ?></td>
+                                    <td><?= htmlspecialchars($row['check_out_by_name'] ?: '-') ?></td>
                                     <td>
-                                        <?= htmlspecialchars($c['reference_number']) ?>
-                                    </td>
-
-                                    <td>
-                                        <?= htmlspecialchars($c['name']) ?>
-                                    </td>
-
-                                    <td>
-                                        <?= !empty($c['start_date']) 
-                                            ? date('d M Y', strtotime($c['start_date'])) 
-                                            : 'N/A' ?>
-                                    </td>
-
-                                    <td>
-                                        <?= !empty($c['end_date']) 
-                                            ? date('d M Y', strtotime($c['end_date'])) 
-                                            : 'N/A' ?>
-                                    </td>
-
-                                    <td class="text-end">
-                                        <?= number_format((float)($c['total_price_final'] ?? 0), 2) ?>
+                                        <span class="badge bg-<?= $row['status'] === 'check_out' ? 'warning' : 'success' ?>">
+                                            <?= htmlspecialchars($row['status']) ?>
+                                        </span>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
+
+                            <?php if (empty($cashHandovers)): ?>
+                                <!-- <tr>
+                                    <td colspan="11" class="text-center">No pending cash handovers found.</td>
+                                </tr> -->
+                            <?php endif; ?>
                         </tbody>
+
+                        <tfoot>
+                            <tr class="fw-bold">
+                                <td colspan="8" class="text-end">Total Pending Cash</td>
+                                <td class="text-end"><?= number_format((float)$totalPendingCash, 2) ?></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
 
@@ -192,16 +246,22 @@ try {
                             <?php foreach ($handovers as $i => $h): ?>
                                 <tr>
                                     <td><?= $i + 1 ?></td>
+
                                     <td>
                                         <?= !empty($h['handover_datetime'])
                                             ? date('d M Y h:i A', strtotime($h['handover_datetime']))
                                             : 'N/A'
                                         ?>
                                     </td>
+
                                     <td><?= htmlspecialchars($h['handover_by_name'] ?? 'Unknown User') ?></td>
                                     <td><?= number_format((int)$h['booking_count']) ?></td>
                                     <td><?= htmlspecialchars($h['reference_numbers']) ?></td>
-                                    <td class="text-end"><?= number_format((float)$h['total_amount'], 2) ?></td>
+
+                                    <td class="text-end">
+                                        <?= number_format((float)$h['total_amount'], 2) ?>
+                                    </td>
+
                                     <td>
                                         <button
                                             type="button"
@@ -242,23 +302,30 @@ try {
                             <?php foreach ($acceptedHandovers as $i => $a): ?>
                                 <tr>
                                     <td><?= $i + 1 ?></td>
+
                                     <td>
                                         <?= !empty($a['handover_datetime'])
                                             ? date('d M Y h:i A', strtotime($a['handover_datetime']))
                                             : 'N/A'
                                         ?>
                                     </td>
+
                                     <td><?= htmlspecialchars($a['handover_by_name'] ?? 'Unknown User') ?></td>
+
                                     <td>
                                         <?= !empty($a['cash_received_datetime'])
                                             ? date('d M Y h:i A', strtotime($a['cash_received_datetime']))
                                             : 'N/A'
                                         ?>
                                     </td>
+
                                     <td><?= htmlspecialchars($a['received_by_name'] ?? 'Unknown User') ?></td>
                                     <td><?= number_format((int)$a['booking_count']) ?></td>
                                     <td><?= htmlspecialchars($a['reference_numbers']) ?></td>
-                                    <td class="text-end"><?= number_format((float)$a['total_amount'], 2) ?></td>
+
+                                    <td class="text-end">
+                                        <?= number_format((float)$a['total_amount'], 2) ?>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -309,6 +376,7 @@ try {
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         Cancel
                     </button>
+
                     <button type="submit" class="btn btn-success" id="confirmAcceptCashBtn">
                         Yes, Accept
                     </button>
@@ -336,10 +404,11 @@ $(function () {
         lengthMenu: [10, 25, 50, 100],
         order: [[3, 'desc']]
     });
-        $('#cashHandoverTable').DataTable({
+
+    $('#cashHandoverTable').DataTable({
         pageLength: 50,
         lengthMenu: [10, 25, 50, 100],
-        order: [[3, 'desc']]
+        order: [[4, 'desc']]
     });
 });
 
@@ -389,5 +458,6 @@ $(document).on('submit', '#acceptCashForm', function (e) {
     });
 });
 </script>
+
 </body>
 </html>

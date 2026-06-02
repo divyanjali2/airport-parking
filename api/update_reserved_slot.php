@@ -66,23 +66,38 @@ try {
         ':reference_number' => $reference_number
     ]);
 
-    $sql2 = "UPDATE reserved_slots
-            SET
-                total_price_final = :total_price_final,
-                end_date_edited = :end_date_edited,
-                vehicle_status = 'completed',
-                payment_status = 'Paid Fully',
-                late_fee_amount = :late_fee_amount
-            WHERE reference_number = :reference_number";
+$sql2 = "UPDATE reserved_slots
+        SET
+            total_price_final = :total_price_final,
+            end_date_edited = :end_date_edited,
+            vehicle_status = 'completed',
+            payment_status = 'Paid Fully',
+            late_fee_amount = :late_fee_amount,
 
-    $stmt2 = $conn->prepare($sql2);
+            cash_handover = CASE
+                WHEN :final_price_for_cash > COALESCE(total_price, 0)
+                THEN 0
+                ELSE cash_handover
+            END,
 
-    $stmt2->execute([
-        ':total_price_final' => $total_price_final,
-        ':end_date_edited' => $end_date_edited,
-        ':late_fee_amount' => $late_fee_amount,
-        ':reference_number' => $reference_number
-    ]);
+            cash_received_status = CASE
+                WHEN :final_price_for_status > COALESCE(total_price, 0)
+                THEN 'pending_extra'
+                ELSE cash_received_status
+            END
+
+        WHERE reference_number = :reference_number";
+
+$stmt2 = $conn->prepare($sql2);
+
+$stmt2->execute([
+    ':total_price_final' => $total_price_final,
+    ':end_date_edited' => $end_date_edited,
+    ':late_fee_amount' => $late_fee_amount,
+    ':final_price_for_cash' => $total_price_final,
+    ':final_price_for_status' => $total_price_final,
+    ':reference_number' => $reference_number
+]);
 
     $conn->commit();
 

@@ -22,6 +22,7 @@ if (empty($_POST['booking_ids']) || !is_array($_POST['booking_ids'])) {
 
 $userId = $_SESSION['user_id'];
 $bookingIds = array_map('intval', $_POST['booking_ids']);
+
 // Generate next batch number
 $stmtBatch = $conn->query("
     SELECT handover_batch
@@ -48,13 +49,16 @@ try {
         UPDATE reserved_slots
         SET 
             cash_handover = 1,
+            payment_status = 'Paid Fully',
             handover_datetime = NOW(),
             handover_by = ?,
-            handover_batch = ?
+            handover_batch = ?,
+            cash_received_status = 'pending'
         WHERE id IN ($placeholders)
-        AND payment_status = 'Paid Fully'
         AND booking_status = 'confirmed'
         AND cash_handover = 0
+        AND is_trashed = 0
+        AND is_no_show = 0
     ";
 
     $params = array_merge([$userId, $handoverBatch], $bookingIds);

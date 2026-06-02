@@ -126,7 +126,7 @@ $completed = $stmtCompleted->fetchAll(PDO::FETCH_ASSOC);
             <!-- =========================
                 ONGOING TABLE
             ========================== -->
-            <h5 class="fw-bold mt-3">Ongoing Reservations</h5>
+            <h5 class="fw-bold mt-3">Cash Collected Reservations</h5>
 
             <div class="table-responsive">
                 <table class="table table-bordered table-striped" id="ongoingTable">
