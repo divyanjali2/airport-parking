@@ -756,20 +756,20 @@ function getBookingPrice() {
 
     let fullDays = Math.floor(totalHours / 24);
 
-    let extraHours = totalHours % 24;
+    let extraHours = Number((totalHours % 24).toFixed(2));
 
     console.log("FULL DAYS:", fullDays);
     console.log("EXTRA HOURS:", extraHours);
 
     let chargedDays = fullDays;
 
-    if (extraHours > 0 && extraHours <= 2) {
+    if (extraHours <= 2) {
         chargedDays += 0;
     }
-    else if (extraHours > 2 && extraHours <= 8) {
+    else if (extraHours <= 8) {
         chargedDays += 0.5;
     }
-    else if (extraHours > 8) {
+    else {
         chargedDays += 1;
     }
 

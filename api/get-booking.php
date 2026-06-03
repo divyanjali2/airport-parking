@@ -44,6 +44,8 @@ try {
             booking_status
         FROM reserved_slots
         WHERE reference_number = ?
+        AND is_trashed = 0
+        AND is_no_show = 0
         LIMIT 1
     ");
 

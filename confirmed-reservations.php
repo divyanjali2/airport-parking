@@ -55,7 +55,6 @@
         die('<div style="color:red;">Database error: ' . $e->getMessage() . '</div>');
     }
 
-
     try {
         $cashStmt = $conn->query("
             SELECT
