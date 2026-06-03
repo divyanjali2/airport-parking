@@ -54,7 +54,11 @@ try {
     $booking = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$booking) {
-        api_error("No booking found for this reference", null, 404);
+        echo json_encode([
+            "status" => "not_found",
+            "message" => "Booking not available. It may have been cancelled, removed, or marked as a no-show."
+        ]);
+        exit;
     }
 
 } catch (Exception $e) {
