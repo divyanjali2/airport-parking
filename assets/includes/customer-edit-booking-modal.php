@@ -30,25 +30,35 @@ try {
 
     if (!$b) exit('Booking not found or cannot be edited');
 
-} catch (PDOException $e) {
-    exit('Database error');
-}
+    $perDayRate = 0;
 
-function toDatetimeLocal($dt) {
-    if (!$dt) return '';
-    $ts = strtotime(str_replace('/', '-', $dt));
-    return $ts ? date('Y-m-d\TH:i', $ts) : '';
-}
+    $rateStmt = $conn->query("
+        SELECT price
+        FROM per_day_rates
+        LIMIT 1
+    ");
 
-$originalEnd = $b['end_date'] ?? null;
-$editedEndDb = !empty($b['end_date_edited']) ? $b['end_date_edited'] : null;
+    $perDayRate = (float)$rateStmt->fetchColumn();
 
-$originalEndTs = strtotime(str_replace('/', '-', $originalEnd));
-$baseTotalPrice = (float)($b['total_price'] ?? 0);
+    } catch (PDOException $e) {
+        exit('Database error');
+    }
 
-$finalTotalPrice = isset($b['total_price_final']) && $b['total_price_final'] !== null
-    ? (float)$b['total_price_final']
-    : $baseTotalPrice;
+    function toDatetimeLocal($dt) {
+        if (!$dt) return '';
+        $ts = strtotime(str_replace('/', '-', $dt));
+        return $ts ? date('Y-m-d\TH:i', $ts) : '';
+    }
+
+    $originalEnd = $b['end_date'] ?? null;
+    $editedEndDb = !empty($b['end_date_edited']) ? $b['end_date_edited'] : null;
+
+    $originalEndTs = strtotime(str_replace('/', '-', $originalEnd));
+    $baseTotalPrice = (float)($b['total_price'] ?? 0);
+
+    $finalTotalPrice = isset($b['total_price_final']) && $b['total_price_final'] !== null
+        ? (float)$b['total_price_final']
+        : $baseTotalPrice;
 ?>
 
 <style>
@@ -203,163 +213,164 @@ $finalTotalPrice = isset($b['total_price_final']) && $b['total_price_final'] !==
 </div>
 
 <script>
-(function () {
-    const baseTotalPrice = <?= json_encode($baseTotalPrice) ?>;
-    const originalEndRaw = <?= json_encode($originalEnd ?? '') ?>;
+    (function () {
+        const baseTotalPrice = <?= json_encode($baseTotalPrice) ?>;
+        const originalEndRaw = <?= json_encode($originalEnd ?? '') ?>;
+        const perDayRate = <?= json_encode($perDayRate) ?>;
 
-    const originalEndTs = new Date(
-        originalEndRaw.replace(/-/g, '/')
-    ).getTime();
-
-    const $editedEnd = $("#customer_edited_end_date");
-    const $updatedTotal = $("#customer_updated_total_price");
-    const $lateLabel = $("#customer_late_fee_label");
-    const $lateFeeAmount = $("#customer_late_fee_amount");
-    function getSurchargePercent(lateMinutes) {
-
-        const lateHours = lateMinutes / 60;
-
-        // Up to 2 hours = Free
-        if (lateHours <= 2) {
-            return 0;
-        }
-
-        // More than 2 hours up to 8 hours = 50%
-        if (lateHours <= 8) {
-            return 50;
-        }
-
-        // More than 8 hours = Full day charge
-        return 100;
-    }
-
-    function recalcPricePreview() {
-
-        if (!originalEndTs || !$editedEnd.val()) {
-
-            $updatedTotal.val(baseTotalPrice.toFixed(2));
-
-            $lateLabel.text("");
-
-            return;
-        }
-
-        const editedEndTs = new Date(
-            $editedEnd.val()
+        const originalEndTs = new Date(
+            originalEndRaw.replace(/-/g, '/')
         ).getTime();
 
-        if (isNaN(editedEndTs)) {
+        const $editedEnd = $("#customer_edited_end_date");
+        const $updatedTotal = $("#customer_updated_total_price");
+        const $lateLabel = $("#customer_late_fee_label");
+        const $lateFeeAmount = $("#customer_late_fee_amount");
+        function getSurchargePercent(lateMinutes) {
 
-            $updatedTotal.val(baseTotalPrice.toFixed(2));
+            const lateHours = lateMinutes / 60;
 
-            $lateLabel
-                .removeClass()
-                .addClass("text-warning")
-                .text("Invalid date format.");
+            // Up to 2 hours = Free
+            if (lateHours <= 2) {
+                return 0;
+            }
 
-            return;
+            // More than 2 hours up to 8 hours = 50%
+            if (lateHours <= 8) {
+                return 50;
+            }
+
+            // More than 8 hours = Full day charge
+            return 100;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | CALCULATE LATE TIME
-        |--------------------------------------------------------------------------
-        */
+        function recalcPricePreview() {
 
-        const diffMs = editedEndTs - originalEndTs;
+            if (!originalEndTs || !$editedEnd.val()) {
 
-        const diffMinutes = Math.ceil(diffMs / 60000);
+                $updatedTotal.val(baseTotalPrice.toFixed(2));
 
-        let pct = 0;
+                $lateLabel.text("");
 
-        if (diffMinutes > 0) {
-            pct = getSurchargePercent(diffMinutes);
-        }
+                return;
+            }
 
-        /*
-        |--------------------------------------------------------------------------
-        | PRICE CALCULATION
-        |--------------------------------------------------------------------------
-        */
+            const editedEndTs = new Date(
+                $editedEnd.val()
+            ).getTime();
 
-        const lateFee = baseTotalPrice * (pct / 100);
+            if (isNaN(editedEndTs)) {
 
-        const updatedTotal = baseTotalPrice + lateFee;
-
-        /*
-        |--------------------------------------------------------------------------
-        | UPDATE UI
-        |--------------------------------------------------------------------------
-        */
-
-        $lateFeeAmount.val(lateFee.toFixed(2));
-
-        $updatedTotal.val(updatedTotal.toFixed(2));
-
-        if (pct === 0) {
-
-            if (diffMinutes > 0) {
+                $updatedTotal.val(baseTotalPrice.toFixed(2));
 
                 $lateLabel
                     .removeClass()
-                    .addClass("text-success")
-                    .text("Up to 2 hours waived off.");
+                    .addClass("text-warning")
+                    .text("Invalid date format.");
+
+                return;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | CALCULATE LATE TIME
+            |--------------------------------------------------------------------------
+            */
+
+            const diffMs = editedEndTs - originalEndTs;
+
+            const diffMinutes = Math.ceil(diffMs / 60000);
+
+            let pct = 0;
+
+            if (diffMinutes > 0) {
+                pct = getSurchargePercent(diffMinutes);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | PRICE CALCULATION
+            |--------------------------------------------------------------------------
+            */
+
+    const lateFee = perDayRate * (pct / 100);
+
+    const updatedTotal = baseTotalPrice + lateFee;
+
+            /*
+            |--------------------------------------------------------------------------
+            | UPDATE UI
+            |--------------------------------------------------------------------------
+            */
+
+            $lateFeeAmount.val(lateFee.toFixed(2));
+
+            $updatedTotal.val(updatedTotal.toFixed(2));
+
+            if (pct === 0) {
+
+                if (diffMinutes > 0) {
+
+                    $lateLabel
+                        .removeClass()
+                        .addClass("text-success")
+                        .text("Up to 2 hours waived off.");
+
+                } else {
+
+                    $lateLabel
+                        .removeClass()
+                        .addClass("text-success")
+                        .text("No late charge.");
+                }
+
+            } else if (pct === 50) {
+
+                $lateLabel
+                    .removeClass()
+                    .addClass("text-warning")
+                    .text(`2 to 8 hours late charge: 50% | Extra LKR ${lateFee.toFixed(2)}`);
 
             } else {
 
                 $lateLabel
                     .removeClass()
-                    .addClass("text-success")
-                    .text("No late charge.");
+                    .addClass("text-danger")
+                    .text(`More than 8 hours: Full day charge | Extra LKR ${lateFee.toFixed(2)}`);
             }
-
-        } else if (pct === 50) {
-
-            $lateLabel
-                .removeClass()
-                .addClass("text-warning")
-                .text(`2 to 8 hours late charge: 50% | Extra LKR ${lateFee.toFixed(2)}`);
-
-        } else {
-
-            $lateLabel
-                .removeClass()
-                .addClass("text-danger")
-                .text(`More than 8 hours: Full day charge | Extra LKR ${lateFee.toFixed(2)}`);
         }
-    }
 
-    $editedEnd.off("change.customerEdit input.customerEdit")
-        .on("change.customerEdit input.customerEdit", recalcPricePreview);
+        $editedEnd.off("change.customerEdit input.customerEdit")
+            .on("change.customerEdit input.customerEdit", recalcPricePreview);
 
-    $("#saveCustomerBookingEdit").off("click.customerEdit").on("click.customerEdit", function () {
-        const bookingId = $(this).data("id");
+        $("#saveCustomerBookingEdit").off("click.customerEdit").on("click.customerEdit", function () {
+            const bookingId = $(this).data("id");
 
-        $.ajax({
-            url: "assets/includes/customer-update-booking.php",
-            type: "POST",
-            dataType: "json",
-            data: {
-                id: bookingId,
-                customer_id: <?= (int)$customerId ?>,
-                edited_end_date: $editedEnd.val(),
-                total_price_final: $updatedTotal.val(),
-                reason: $("#customer_edit_reason").val()
-            },
-            success: function (res) {
-                if (res.success) {
-                    alert("Booking updated successfully.");
-                    location.reload();
-                } else {
-                    alert(res.message || "Failed to update booking.");
+            $.ajax({
+                url: "assets/includes/customer-update-booking.php",
+                type: "POST",
+                dataType: "json",
+                data: {
+                    id: bookingId,
+                    customer_id: <?= (int)$customerId ?>,
+                    edited_end_date: $editedEnd.val(),
+                    total_price_final: $updatedTotal.val(),
+                    reason: $("#customer_edit_reason").val()
+                },
+                success: function (res) {
+                    if (res.success) {
+                        alert("Booking updated successfully.");
+                        location.reload();
+                    } else {
+                        alert(res.message || "Failed to update booking.");
+                    }
+                },
+                error: function () {
+                    alert("Server error while updating booking.");
                 }
-            },
-            error: function () {
-                alert("Server error while updating booking.");
-            }
+            });
         });
-    });
 
-    recalcPricePreview();
-})();
+        recalcPricePreview();
+    })();
 </script>

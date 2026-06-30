@@ -71,10 +71,30 @@ try {
     // ===============================
     // GENERATE REFERENCE
     // ===============================
-    $stmt = $conn->prepare("SELECT COUNT(*) FROM reserved_slots WHERE slot_number = :slot");
-    $stmt->execute([':slot' => $data['slot']]);
-    $count = (int)$stmt->fetchColumn();
-    $reference = $data['slot'] . '-AP-' . str_pad($count + 1, 2, '0', STR_PAD_LEFT);
+
+    // Current month and day (MMDD)
+    $datePart = date('md');
+
+    // Count today's bookings for this slot
+    $stmt = $conn->prepare("
+        SELECT COUNT(*)
+        FROM reserved_slots
+        WHERE slot_number = :slot
+        AND DATE(created_at) = CURDATE()
+    ");
+    $stmt->execute([
+        ':slot' => $data['slot']
+    ]);
+
+    $sequence = (int)$stmt->fetchColumn() + 1;
+
+    // Generate reference
+    $reference = sprintf(
+        "%s-AP-%02d-%s",
+        strtoupper($data['slot']),
+        $sequence,
+        $datePart
+    );
 
     // ===============================
     // INSERT BOOKING

@@ -763,15 +763,15 @@ function getBookingPrice() {
 
     let chargedDays = fullDays;
 
-    if (extraHours <= 2) {
-        chargedDays += 0;
-    }
-    else if (extraHours <= 8) {
-        chargedDays += 0.5;
-    }
-    else {
-        chargedDays += 1;
-    }
+if (extraHours <= 2) {
+    chargedDays += 0;
+}
+else if (extraHours <= 8) {
+    chargedDays += 0.5;
+}
+else {
+    chargedDays += 1;
+}
 
     if (chargedDays < 1) {
         chargedDays = 1;

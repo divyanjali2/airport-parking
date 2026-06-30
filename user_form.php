@@ -125,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <option value="gm" <?= ($user['role'] === 'gm') ? 'selected' : '' ?>>General Manager</option>
                             <option value="finance" <?= ($user['role'] === 'finance') ? 'selected' : '' ?>>Finance</option>
                             <option value="staff" <?= ($user['role'] === 'staff') ? 'selected' : '' ?>>Staff</option>
+                            <option value="operational-user" <?= ($user['role'] === 'operational-user') ? 'selected' : '' ?>>Operational User</option>
                         </select>
                     </div>
 

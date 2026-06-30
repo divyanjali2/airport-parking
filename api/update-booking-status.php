@@ -1,6 +1,10 @@
 <?php
 
+session_start();
+
 require_once __DIR__ . '/../assets/includes/db_connect.php';
+
+$confirmedBy = $_POST['confirmed_by'] ?? $_GET['confirmed_by'] ?? null;
 
 function api_error($message, $data = null, $code = 400)
 {
@@ -74,12 +78,17 @@ try {
 
 try {
     $update = $conn->prepare("
-        UPDATE reserved_slots 
-        SET booking_status = ?
+        UPDATE reserved_slots
+        SET booking_status = ?,
+            confirmed_by = ?
         WHERE reference_number = ?
     ");
 
-    $update->execute([$status, $reference]);
+    $update->execute([
+        $status,
+        $confirmedBy,
+        $reference
+    ]);
 
 } catch (Exception $e) {
     api_error("Failed to update status", $e->getMessage(), 500);

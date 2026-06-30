@@ -331,7 +331,20 @@ if (!empty($b['images'])) {
             |--------------------------------------------------------------------------
             */
 
-            const lateFee = baseTotalPrice * (surchargePercent / 100);
+            // Calculate booking days
+            const startDate = parseDbDate($('#edited_end_date').attr('data-start-date'));
+            // const originalEnd = parseDbDate(originalDb);
+
+            const bookingDays = Math.max(
+                1,
+                Math.ceil((originalEnd.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+            );
+
+            // Per-day rate
+            const perDayAmount = baseTotalPrice / bookingDays;
+
+            // Calculate surcharge from ONE day's amount
+            const lateFee = perDayAmount * (surchargePercent / 100);
 
             const updatedPrice = baseTotalPrice + lateFee;
 

@@ -23,6 +23,7 @@
                 rs.email,
                 rs.booking_type,
                 rs.whatsapp_number,
+                rs.confirmed_by,
                 rs.total_price_final,
                 rs.booking_status,
 
@@ -36,7 +37,7 @@
             WHERE rs.is_trashed = 0
             AND rs.is_no_show = 0
             AND rs.cash_handover = 0
-            AND rs.booking_status = 'confirmed'
+           
 
             ORDER BY rs.created_at DESC
         ");
@@ -150,9 +151,18 @@
                         </button>
                     </div>
                     
-                    <h2 class="text-center fw-bold">🚘 Confirmed Booking Dashboard</h2>
+                    <h2 class="text-center fw-bold">🚘 Booking Dashboard</h2>
                     <div id="redirectMessage" class="text-center"></div>
                     <div class="mb-3 d-flex align-items-end gap-3 justify-content-end">
+
+                        <div>
+                            <label for="bookingStatusFilter" class="form-label">Filter by Status:</label>
+                            <select id="bookingStatusFilter" class="form-select w-auto">
+                                <option value="">All</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="pending">Pending</option>
+                            </select>
+                        </div>
                         <div>
                             <label for="bookingTypeFilter" class="form-label">Filter by Booking Type:</label>
                             <select id="bookingTypeFilter" class="form-select w-auto">
@@ -187,9 +197,9 @@
                                     <th>Booking Type</th>
                                     <th>Reference No</th>
                                     <th>Customer</th>
-                                    <th>WhatsApp</th>
                                     <th>Date</th>
-                                    <th>Total Price (LKR)</th>
+                                    <th>Total Price</th>
+                                    <th>Booking Status</th>
                                     <th>Invoice</th>
                                     <th>Action</th>
                                 </tr>
@@ -201,11 +211,33 @@
                                         <td><?= ucfirst(htmlspecialchars($b['booking_type'])) ?></td>
                                         <td><?= htmlspecialchars($b['reference_number']) ?></td>
                                         <td><?= htmlspecialchars($b['customer_name']) ?></td>
-                                        <td><?= htmlspecialchars($b['whatsapp_number']) ?></td>
                                         <td data-order="<?= $b['start_date'] ?>">
                                             <?= date('d M Y', strtotime($b['start_date'])) ?> - <?= date('d M Y', strtotime($b['end_date'])) ?>
                                         </td>
-                                        <td><?= number_format(!empty($b['total_price_final']) ? $b['total_price_final'] : $b['total_price'], 2) ?></td>                                        <td>
+                                        <td><?= number_format(!empty($b['total_price_final']) ? $b['total_price_final'] : $b['total_price'], 2) ?></td>  
+                                        <td>
+                                            <?php
+                                                $status = strtolower($b['booking_status']);
+
+                                                $textClass = match ($status) {
+                                                    'confirmed' => 'text-success',
+                                                    'pending'   => 'text-primary',
+                                                    default     => 'text-secondary',
+                                                };
+                                            ?>
+
+                                            <span class="<?= $textClass ?> fw-bold">
+                                                <?= htmlspecialchars(ucfirst($b['booking_status'])) ?>
+                                            </span>
+
+                                            <?php if (!empty($b['confirmed_by'])): ?>
+                                            
+                                                <small class="text-muted">
+                                                by <?= htmlspecialchars($b['confirmed_by']) ?>
+                                                </small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
                                             <?php if (!empty($b['pdf_path'])): ?>
                                                 <?php 
                                                     $webPath = str_replace('\\', '/', $b['pdf_path']); 
@@ -215,13 +247,13 @@
                                                     }
                                                 ?>
                                                 <a href="<?= htmlspecialchars($webPath) ?>" target="_blank" class="btn btn-sm btn-primary">
-                                                    View PDF
+                                                    PDF
                                                 </a>
                                             <?php else: ?>
                                                 N/A
                                             <?php endif; ?>
                                         </td>
-                                                               
+                       
                                         <td class="d-flex gap-1">
                                             <?php if (!empty($b['receipt_path'])): ?>
 
@@ -240,7 +272,7 @@
                                                     target="_blank"
                                                     class="btn btn-sm btn-outline-primary"
                                                 >
-                                                    View Receipt
+                                                    Receipt
                                                 </a>
 
                                             <?php else: ?>
@@ -249,7 +281,7 @@
                                                     class="btn btn-sm btn-outline-secondary"
                                                     disabled
                                                 >
-                                                    View Receipt
+                                                Receipt
                                                 </button>
 
                                             <?php endif; ?>
@@ -533,6 +565,10 @@
                     .draw()
             );
 
+            $('#bookingStatusFilter').on('change', function () {
+                table.column(6).search($(this).val()).draw();
+            });
+
             const normalizeDate = v => {
                 const d = new Date(v);
                 return isNaN(d) ? null : d.toISOString().slice(0, 10);
@@ -554,6 +590,24 @@
 
             $('#clearDateFilter').on('click', () => {
                 location.reload();
+            });
+
+            // $.fn.dataTable.ext.search.push(function (settings, data) {
+
+            //     const bookingType = $('#bookingTypeFilter').val().toLowerCase();
+            //     const bookingStatus = $('#bookingStatusFilter').val().toLowerCase();
+
+            //     const rowType = (data[1] || '').toLowerCase();
+            //     const rowStatus = (data[6] || '').toLowerCase();
+
+            //     return (
+            //         (bookingType === '' || rowType === bookingType) &&
+            //         (bookingStatus === '' || rowStatus.includes(bookingStatus))
+            //     );
+            // });
+
+            $('#bookingTypeFilter, #bookingStatusFilter').on('change', function () {
+                table.draw();
             });
             
             $(function () {

@@ -3,13 +3,13 @@
  *  MODX Configuration file
  */
 $database_type = 'mysql';
-$database_server = 'localhost';
+$database_server = '127.0.0.1:3307';
 $database_connection_charset = 'utf8mb4';
 $table_prefix = 'modx_';
 $dbase = 'airport--parking';
 $database_user = 'root';
 $database_password = '';
-$database_dsn = 'mysql:host=localhost;dbname=airport--parking;charset=utf8mb4';
+$database_dsn = 'mysql:host=localhost;dbname=airport--parking;port=3307;charset=utf8mb4';
 $config_options = array (
 );
 $driver_options = array (

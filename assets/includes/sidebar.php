@@ -27,31 +27,31 @@
             </a>
         </li>
 
-        <?php if (in_array($role, ['staff', 'admin'])): ?>
+        <!-- <?php if (in_array($role, ['staff', 'admin','operational-user'])): ?>
             <li class="nav-item">
                 <a href="./reservations.php" class="nav-link text-white <?= $currentPage === 'reservations.php' ? 'active' : '' ?>" aria-current="page">
                     <i class="bi bi-calendar-check me-2"></i> Reservations <span class="badge bg-light text-dark ms-2">1</span>
                 </a>
             </li>
-        <?php endif; ?>
+        <?php endif; ?> -->
 
-        <?php if (in_array($role, ['staff', 'admin'])): ?>
+        <?php if (in_array($role, ['staff', 'admin','operational-user'])): ?>
             <li class="nav-item">
-                <a href="./confirmed-reservations.php" class="nav-link text-white <?= $currentPage === 'confirmed-reservations.php' ? 'active' : '' ?>" aria-current="page">
-                    <i class="bi bi-calendar-check me-2"></i> Confirmed Reservations <span class="badge bg-light text-dark ms-2">2</span>
+                <a href="./reservation.php" class="nav-link text-white <?= $currentPage === 'reservation.php' ? 'active' : '' ?>" aria-current="page">
+                    <i class="bi bi-calendar-check me-2"></i> Reservations <span class="badge bg-light text-dark ms-2">1</span>
                 </a>
             </li>
         <?php endif; ?>
 
-        <?php if (in_array($role, ['finance', 'admin'])): ?>
+        <?php if (in_array($role, ['finance', 'admin','operational-user'])): ?>
             <li class="nav-item">
                 <a href="./received-cash.php" class="nav-link text-white <?= $currentPage === 'received-cash.php' ? 'active' : '' ?>" aria-current="page">
-                    <i class="bi bi-person-dash me-2"></i> Cash Collection <span class="badge bg-light text-dark ms-2">3</span>
+                    <i class="bi bi-person-dash me-2"></i> Cash Collection <span class="badge bg-light text-dark ms-2">2</span>
                 </a>
             </li>
         <?php endif; ?>
 
-        <?php if (in_array($role, ['staff', 'admin','finance'])): ?>
+        <?php if (in_array($role, ['staff', 'admin','finance','operational-user'])): ?>
             <li class="nav-item">
                 <a href="./customer_handling_list.php" class="nav-link text-white <?= $currentPage === 'customer_handling_list.php' ? 'active' : '' ?>" aria-current="page">
                     <i class="bi bi-cash-stack me-2"></i> Customer Handling List
@@ -67,7 +67,7 @@
             </li>
         <?php endif; ?> 
 
-        <?php if (in_array($role, ['staff', 'admin','finance'])): ?>
+        <?php if (in_array($role, ['staff', 'admin','finance','operational-user'])): ?>
             <li class="nav-item">
                 <a href="./payment-receipts.php" class="nav-link text-white <?= $currentPage === 'payment-receipts.php' ? 'active' : '' ?>" aria-current="page">
                     <i class="bi bi-calendar-check me-2"></i> Payment Receipts
@@ -75,7 +75,7 @@
             </li>
         <?php endif; ?>
 
-        <?php if (in_array($role, ['staff', 'admin','finance'])): ?>
+        <?php if (in_array($role, ['staff', 'admin','finance','operational-user'])): ?>
             <li class="nav-item">
                 <a href="./vehicles-on-premises.php" class="nav-link text-white <?= $currentPage === 'vehicles-on-premises.php' ? 'active' : '' ?>" aria-current="page">
                     <i class="bi bi-car-front me-2"></i> Vehicles on Premises
@@ -83,7 +83,7 @@
             </li>
         <?php endif; ?>
 
-        <?php if (in_array($role, ['staff', 'admin'])): ?>
+        <?php if (in_array($role, ['staff', 'admin','operational-user'])): ?>
             <li class="nav-item">
                 <a href="./no-show-bookings.php" class="nav-link text-white <?= $currentPage === 'no-show-bookings.php' ? 'active' : '' ?>" aria-current="page">
                     <i class="bi bi-person-dash me-2"></i> No Show Bookings
@@ -91,15 +91,13 @@
             </li>
         <?php endif; ?>
 
-        <?php if (in_array($role, ['staff', 'admin'])): ?>
+        <?php if (in_array($role, ['staff', 'admin','operational-user'])): ?>
             <li class="nav-item">
                 <a href="./cash-handovers.php" class="nav-link text-white <?= $currentPage === 'cash-handovers.php' ? 'active' : '' ?>" aria-current="page">
                     <i class="bi bi-cash-stack me-2"></i> Cash Handover Details
                 </a>
             </li>
         <?php endif; ?>
-
-
 
         <!-- <?php if (in_array($role, ['finance', 'admin'])): ?>
             <li class="nav-item">
