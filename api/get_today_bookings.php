@@ -33,17 +33,18 @@ try {
         WHERE
             is_trashed = 0
             AND is_no_show = 0
-            AND DATE(start_date) = ?
+            AND DATE(start_date) BETWEEN ? AND DATE_ADD(?, INTERVAL 6 DAY)
         ORDER BY start_date ASC
     ");
 
-    $stmt->execute([$date]);
+    $stmt->execute([$date, $date]);
 
     $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([
         "status" => "success",
-        "date" => $date,
+        "from_date" => $date,
+        "to_date" => date('Y-m-d', strtotime($date . ' +6 days')),
         "count" => count($bookings),
         "bookings" => $bookings
     ]);
