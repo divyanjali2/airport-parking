@@ -2,33 +2,22 @@
 session_start();
 require_once __DIR__ . '/assets/includes/db_connect.php';
 
-$selectedDate = $_GET['date'] ?? date('Y-m-d');
-$selectedStart = $selectedDate . ' 00:00:00';
-$selectedEnd   = $selectedDate . ' 23:59:59';
-
 try {
-    $stmt = $conn->prepare("
+    $stmt = $conn->query("
         SELECT
             id,
             reference_number,
-            booking_type,
-            name AS customer_name,
-            start_date,
-            end_date,
-            total_price,
-            total_price_final,
-            pdf_path
-        FROM reserved_slots
-        WHERE is_trashed = 0
-          AND is_no_show = 0
-          AND start_date <= :selected_end
-          AND end_date >= :selected_start
-        ORDER BY start_date DESC
+            check_in_datetime,
+            check_in_by_name,
+            check_out_datetime,
+            check_out_by_name,
+            created_at,
+            updated_at,
+            status
+        FROM customer_handling
+        WHERE status = 'check_in'
+        ORDER BY check_in_datetime DESC
     ");
-    $stmt->execute([
-        ':selected_start' => $selectedStart,
-        ':selected_end'   => $selectedEnd
-    ]);
     $parkedVehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     die('<div style="color:red;">Database error: ' . htmlspecialchars($e->getMessage()) . '</div>');
@@ -71,72 +60,52 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                    
                 </div>
 
-                <form method="GET" class="mb-3 d-flex align-items-end gap-3 justify-content-end">
-                    <div>
-                        <label for="dateFilter" class="form-label">Filter by Date:</label>
-                        <input
-                            type="date"
-                            id="dateFilter"
-                            name="date"
-                            class="form-control"
-                            value="<?= htmlspecialchars($selectedDate) ?>"
-                            style="width:170px;"
-                        >
-                    </div>
-                    <div>
-                        <button type="submit" class="btn btn-primary">Apply</button>
-                    </div>
-                    <div>
-                        <a href="vehicles-on-premises.php" class="btn btn-danger">Today</a>
-                    </div>
+                <div class="mb-3 d-flex align-items-end gap-3 justify-content-end">
                     <div>
                         <button type="button" id="exportCSV" class="btn btn-info">Export CSV</button>
                     </div>
-                </form>
+                </div>
 
                 <div class="table-responsive">
                     <table id="parkedVehiclesTable" class="table table-bordered table-striped align-middle">
                         <thead>
                         <tr class="table-dark">
                             <th>#</th>
-                            <th>Booking Type</th>
                             <th>Reference No</th>
-                            <th>Customer Name</th>
-                            <th>Date Range</th>
-                            <th>Total Price (LKR)</th>
-                            <th>PDF</th>
+                            <th>Check In DateTime</th>
+                            <th>Check In By</th>
+                            <th>Check Out DateTime</th>
+                            <th>Check Out By</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                            <th>Updated At</th>
                         </tr>
                         </thead>
                         <tbody>
                         <?php foreach ($parkedVehicles as $i => $b): ?>
                             <tr>
                                 <td><?= $i + 1 ?></td>
-                                <td><?= ucfirst(htmlspecialchars($b['booking_type'])) ?></td>
                                 <td><?= htmlspecialchars($b['reference_number']) ?></td>
-                                <td><?= htmlspecialchars($b['customer_name']) ?></td>
-                                <td data-order="<?= htmlspecialchars($b['start_date']) ?>">
-                                    <?= date('d M Y H:i', strtotime($b['start_date'])) ?>
-                                    -
-                                    <?= date('d M Y H:i', strtotime($b['end_date'])) ?>
+                                <td data-order="<?= htmlspecialchars($b['check_in_datetime']) ?>">
+                                    <?= !empty($b['check_in_datetime']) ? date('d M Y H:i', strtotime($b['check_in_datetime'])) : 'N/A' ?>
                                 </td>
-                                <td>
-                                    <?= number_format(!empty($b['total_price_final']) ? $b['total_price_final'] : $b['total_price'], 2) ?>
+                                <td><?= htmlspecialchars($b['check_in_by_name'] ?? 'N/A') ?></td>
+                                <td data-order="<?= htmlspecialchars($b['check_out_datetime']) ?>">
+                                    <?= !empty($b['check_out_datetime']) ? date('d M Y H:i', strtotime($b['check_out_datetime'])) : 'N/A' ?>
                                 </td>
+                                <td><?= htmlspecialchars($b['check_out_by_name'] ?? 'N/A') ?></td>
                                 <td>
-                                    <?php if (!empty($b['pdf_path'])): ?>
-                                        <?php
-                                        $webPath = str_replace('\\', '/', $b['pdf_path']);
-                                        $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT']);
-                                        if (strpos($webPath, $docRoot) === 0) {
-                                            $webPath = substr($webPath, strlen($docRoot));
-                                        }
-                                        ?>
-                                        <a href="<?= htmlspecialchars($webPath) ?>" target="_blank" class="btn btn-sm btn-primary">
-                                            View PDF
-                                        </a>
+                                    <?php if ($b['status'] == 'check_in'): ?>
+                                        <span class="badge bg-success p-2">Check In</span>
                                     <?php else: ?>
-                                        N/A
+                                        <span class="badge bg-danger p-2">Check Out</span>
                                     <?php endif; ?>
+                                </td>
+                                <td data-order="<?= htmlspecialchars($b['created_at']) ?>">
+                                    <?= date('d M Y H:i', strtotime($b['created_at'])) ?>
+                                </td>
+                                <td data-order="<?= htmlspecialchars($b['updated_at']) ?>">
+                                    <?= date('d M Y H:i', strtotime($b['updated_at'])) ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -164,13 +133,13 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             pageLength: 25,
             lengthMenu: [5, 10, 25, 50, 100],
             responsive: true,
-            order: [[4, 'desc']],
+            order: [[2, 'desc']],
             buttons: [{
                 extend: 'csvHtml5',
                 className: 'd-none',
                 text: 'Export CSV',
                 exportOptions: {
-                    columns: [0,1,2,3,4,5],
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8],
                     modifier: { search: 'applied' }
                 }
             }]

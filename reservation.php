@@ -145,11 +145,11 @@
         <div class="flex-grow-1">
             <div class="container-fluid">
                 <div class="card dashboard-card">
-                    <div class="d-flex justify-content-end">
+                    <!-- <div class="d-flex justify-content-end">
                         <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#cashHandoverModal">
                             <i class="bi bi-cash-coin me-1"></i> Cash Handover
                         </button>
-                    </div>
+                    </div> -->
                     
                     <h2 class="text-center fw-bold">🚘 Booking Dashboard</h2>
                     <div id="redirectMessage" class="text-center"></div>
@@ -334,99 +334,6 @@
                     </div>
                 </div>
             </div>
-
-
-            <div class="modal fade" id="cashHandoverModal" tabindex="-1" aria-labelledby="cashHandoverModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                    <div class="modal-content">
-                        <form id="cashHandoverForm">
-                            <div class="modal-header bg-warning">
-                                <h5 class="modal-title fw-bold" id="cashHandoverModalLabel">
-                                    <i class="bi bi-cash-coin me-1"></i> Cash Handover - Pending Cash Collection
-                                </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-
-                            <div class="modal-body">
-                               <div class="table-responsive">
-                                    <table class="table table-bordered table-striped align-middle" id="cashHandoverTable">
-                                        <thead class="table-dark">
-                                            <tr>
-                                                <th>Select</th>
-                                                <th>#</th>
-                                                <th>Reference No</th>
-                                                <th>Customer</th>
-                                                <th>WhatsApp</th>
-                                                <th>Check In Date/Time</th>
-                                                <th>Check In By</th>
-                                                <th>Check Out Date/Time</th>
-                                                <th>Check Out By</th>
-                                                <th>Status</th>
-                                                <th>Payment Type</th>
-                                                <th class="text-end">Cash Collected (LKR)</th>
-                                            </tr>
-                                        </thead>
-
-                                        <tbody>
-                                            <?php if (!empty($cashHandovers)): ?>
-                                                <?php foreach ($cashHandovers as $index => $row): ?>
-                                                    <tr>
-                                                    <td>
-                                                        <input
-                                                            type="checkbox"
-                                                            class="cash-handover-check"
-                                                            value="<?= $row['reserved_slot_id'] ?>">
-                                                    </td>
-
-                                                    <td><?= $index + 1 ?></td>
-                                                        <td><?= htmlspecialchars($row['reference_number'] ?? '-') ?></td>
-                                                        <td><?= htmlspecialchars($row['customer_name'] ?? '-') ?></td>
-                                                        <td><?= htmlspecialchars($row['whatsapp_number'] ?? '-') ?></td>
-                                                        <td><?= htmlspecialchars($row['check_in_datetime'] ?? '-') ?></td>
-                                                        <td><?= htmlspecialchars($row['check_in_by_name'] ?? '-') ?></td>
-                                                        <td><?= !empty($row['check_out_datetime']) ? htmlspecialchars($row['check_out_datetime']) : '-' ?></td>
-                                                        <td><?= !empty($row['check_out_by_name']) ? htmlspecialchars($row['check_out_by_name']) : '-' ?></td>
-                                                        <td>
-                                                            <span class="badge bg-<?= ($row['status'] ?? '') === 'check_out' ? 'warning' : 'success' ?>">
-                                                                <?= htmlspecialchars($row['status'] ?? '-') ?>
-                                                            </span>
-                                                        </td>
-                                                        <td>Cash</td>
-                                                        <td class="text-end">
-                                                            <?= number_format((float) ($row['cash_collected'] ?? 0), 2) ?>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            <?php else: ?>
-                                                <!-- <tr>
-                                                    <td colspan="11" class="text-center">No pending cash handovers found.</td>
-                                                </tr> -->
-                                            <?php endif; ?>
-                                        </tbody>
-
-                                        <tfoot>
-                                            <tr class="fw-bold">
-                                                <td colspan="11" class="text-end">Total Pending Cash</td>
-                                                <td class="text-end">
-                                                    <?= number_format((float) $totalPendingCash, 2) ?>
-                                                </td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                <button type="submit" id="saveCashHandover" class="btn btn-warning fw-bold">
-                                    Save Handover
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
             <div class="modal fade" id="noShowModal" tabindex="-1" aria-labelledby="noShowModalLabel" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">

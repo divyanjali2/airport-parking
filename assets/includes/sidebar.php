@@ -43,10 +43,18 @@
             </li>
         <?php endif; ?>
 
+        <?php if (in_array($role, ['staff', 'admin','operational-user'])): ?>
+            <li class="nav-item">
+                <a href="./cash-handover.php" class="nav-link text-white <?= $currentPage === 'cash-handover.php' ? 'active' : '' ?>" aria-current="page">
+                    <i class="bi bi-calendar-check me-2"></i> Cash Handover <span class="badge bg-light text-dark ms-2">2</span>
+                </a>
+            </li>
+        <?php endif; ?>
+
         <?php if (in_array($role, ['finance', 'admin','operational-user'])): ?>
             <li class="nav-item">
                 <a href="./received-cash.php" class="nav-link text-white <?= $currentPage === 'received-cash.php' ? 'active' : '' ?>" aria-current="page">
-                    <i class="bi bi-person-dash me-2"></i> Cash Collection <span class="badge bg-light text-dark ms-2">2</span>
+                    <i class="bi bi-person-dash me-2"></i> Cash Collection <span class="badge bg-light text-dark ms-2">3</span>
                 </a>
             </li>
         <?php endif; ?>
