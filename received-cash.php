@@ -16,7 +16,15 @@
                 u.name AS handover_by_name,
                 COUNT(*) AS booking_count,
 
-                SUM(COALESCE(rs.total_price_final, 0)) AS total_amount,
+                SUM(
+                    CASE
+                        WHEN LOWER(TRIM(ch.status)) = 'check_in'
+                            THEN COALESCE(rs.total_price_final, rs.total_price, 0)
+                        WHEN LOWER(TRIM(ch.status)) = 'check_out'
+                            THEN COALESCE(rs.total_price_final, 0) - COALESCE(rs.total_price, 0)
+                        ELSE 0
+                    END
+                ) AS total_amount,
 
                 SUM(
                     CASE
@@ -295,7 +303,7 @@
 
                                         <td class="text-end">
                                             <?php
-                                                $rowTotalAmount = (float)($h['total_amount'] ?? 0);
+                                                $rowTotalAmount = (float)($h['checkin_amount'] ?? 0) + (float)($h['checkout_amount'] ?? 0);
                                                 echo number_format($rowTotalAmount, 2);
                                             ?>
                                         </td>
