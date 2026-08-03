@@ -30,6 +30,7 @@ try {
             rs.cash_handover_checkin,
             rs.handover_datetime,
             rs.handover_by,
+            rs.cash_received_status,
 
             CASE
                 WHEN ch.status = 'check_out'
@@ -82,6 +83,8 @@ try {
             rs.cash_handover_checkin,
             rs.handover_datetime,
             rs.handover_by,
+            rs.cash_received_status,
+            rs.cash_received_datetime,
 
             CASE
                 WHEN ch.status = 'check_out'
@@ -399,6 +402,7 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                     <th>Payment Type</th>
                                     <th>Handover Status</th>
                                     <th class="text-end">Cash Collected (LKR)</th>
+                                    <th>Finance Status</th>
                                 </tr>
                             </thead>
 
@@ -518,6 +522,19 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                                     <?= number_format($cashCollected, 2) ?>
                                                 <?php endif; ?>
                                             </td>
+
+                                            <!-- Finance Status -->
+                                            <td class="text-center">
+                                                <?php if (($row['cash_received_status'] ?? '') === 'accepted'): ?>
+                                                    <span class="badge bg-success">
+                                                        <i class="bi bi-check-circle me-1"></i>Accepted
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-warning text-dark">
+                                                        <i class="bi bi-clock me-1"></i>Pending
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php else: ?>
@@ -531,7 +548,7 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
 
                             <tfoot>
                                 <tr class="total-row">
-                                    <td colspan="14" class="text-end">
+                                    <td colspan="15" class="text-end">
                                         <i class="bi bi-cash-stack me-1"></i> Total Pending Cash
                                     </td>
                                     <td class="text-end">
@@ -580,10 +597,11 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                 <th>Check Out Date/Time</th>
                                 <!-- <th>Type</th> -->
                                 <th>Handover Date/Time</th>
-                                <th>Handover By</th>
+                                <!-- <th>Handover By</th> -->
                                 <th>Original Price (LKR)</th>
                                 <th>Late Payment /(LKR)</th>
                                 <th>Final Price (LKR)</th>
+                                <th>Finance Status</th>
                             </tr>
                         </thead>
 
@@ -651,11 +669,11 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                                 : '<span class="text-muted">—</span>' ?>
                                         </td>
 
-                                        <td>
+                                        <!-- <td>
                                             <?= !empty($row['handover_by'])
                                                 ? htmlspecialchars($row['handover_by'])
                                                 : '<span class="text-muted">—</span>' ?>
-                                        </td>
+                                        </td> -->
 
                                         <td class="text-end">
                                             <?= number_format($originalPrice, 2) ?>
@@ -675,11 +693,23 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                             <?php endif; ?>
                                         </td>
 
-                                        <!-- <td class="text-end fw-bold">
-                                            <span class="text-success">
-                                                <?= htmlspecialchars($amountDisplay) ?>
-                                            </span>
-                                        </td> -->
+                                        <!-- Finance Status -->
+                                        <td class="text-center">
+                                            <?php if (($row['cash_received_status'] ?? '') === 'accepted'): ?>
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle me-1"></i>Accepted
+                                                </span>
+                                                <?php if (!empty($row['cash_received_datetime'])): ?>
+                                                    <br><small class="text-muted" style="font-size:10px;">
+                                                        <?= date('d M Y h:i A', strtotime($row['cash_received_datetime'])) ?>
+                                                    </small>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="bi bi-clock me-1"></i>Pending
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
@@ -693,7 +723,7 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
 
                         <!-- <tfoot>
                             <tr class="total-row-completed">
-                                <td colspan="9" class="text-end">
+                                <td colspan="10" class="text-end">
                                     <i class="bi bi-cash-stack me-1"></i> Total Completed Handovers
                                 </td>
                                 <td class="text-end">
