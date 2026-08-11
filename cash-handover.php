@@ -313,6 +313,102 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
             font-weight: 600;
             display: inline-block;
         }
+        .ref-link {
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-style: dashed;
+            text-underline-offset: 3px;
+            transition: all 0.2s ease;
+        }
+
+        .ref-link:hover {
+            color: #0d6efd;
+            text-decoration-style: solid;
+        }
+
+        .breakdown-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .breakdown-table th,
+        .breakdown-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .breakdown-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            text-align: left;
+            width: 55%;
+        }
+
+        .breakdown-table td {
+            text-align: right;
+            font-weight: 500;
+        }
+
+        .breakdown-table tr.total-row th,
+        .breakdown-table tr.total-row td {
+            background-color: #0a277d;
+            color: #fff;
+            font-weight: 700;
+            font-size: 14px;
+            border-bottom: none;
+        }
+
+        .breakdown-table tr.final-row th,
+        .breakdown-table tr.final-row td {
+            background-color: #dc3545;
+            color: #fff;
+            font-weight: 700;
+            font-size: 14px;
+            border-bottom: none;
+        }
+
+        .breakdown-table tr.extras-row th,
+        .breakdown-table tr.extras-row td {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .breakdown-table tr.late-fee-row th,
+        .breakdown-table tr.late-fee-row td {
+            color: #dc3545;
+        }
+
+        .breakdown-header-info {
+            background: linear-gradient(135deg, #0b0833, #1e3a5f);
+            color: #fff;
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 16px;
+            font-size: 12px;
+        }
+
+        .breakdown-header-info .bh-label {
+            opacity: 0.7;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .breakdown-header-info .bh-value {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        #priceBreakdownModal .modal-header {
+            background-color: #0a277d;
+            color: #fff;
+        }
+
+        #priceBreakdownModal .modal-header .btn-close {
+            filter: invert(1);
+        }
     </style>
 </head>
 <body>
@@ -440,7 +536,9 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                             <td><?= $index + 1 ?></td>
 
                                             <td class="fw-bold text-primary">
-                                                <?= htmlspecialchars($row['reference_number'] ?? '-') ?>
+                                                <span class="ref-link" data-ref="<?= htmlspecialchars($row['reference_number'] ?? '') ?>" title="Click to view price breakdown">
+                                                    <?= htmlspecialchars($row['reference_number'] ?? '-') ?>
+                                                </span>
                                             </td>
 
                                             <td><?= htmlspecialchars($row['customer_name'] ?? '-') ?></td>
@@ -635,7 +733,9 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                         <td><?= $index + 1 ?></td>
 
                                         <td class="fw-bold text-primary">
-                                            <?= htmlspecialchars($row['reference_number'] ?? '-') ?>
+                                            <span class="ref-link" data-ref="<?= htmlspecialchars($row['reference_number'] ?? '') ?>" title="Click to view price breakdown">
+                                                <?= htmlspecialchars($row['reference_number'] ?? '-') ?>
+                                            </span>
                                         </td>
 
                                         <td><?= htmlspecialchars($row['customer_name'] ?? '-') ?></td>
@@ -740,6 +840,31 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
     </div>
 </div>
 
+<!-- Price Breakdown Modal -->
+<div class="modal fade" id="priceBreakdownModal" tabindex="-1" aria-labelledby="priceBreakdownModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="priceBreakdownModalLabel">
+                    <i class="bi bi-receipt-cutoff me-2"></i>Price Breakdown
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="priceBreakdownBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading price breakdown...</p>
+                </div>
+            </div>
+            <div class="modal-footer" id="priceBreakdownFooter">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/2.1.2/js/dataTables.js"></script>
@@ -840,6 +965,166 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
             });
         });
 
+    });
+</script>
+
+<script>
+    $(function () {
+        // ── Price Breakdown Modal ──
+        $(document).on('click', '.ref-link', function () {
+            const ref = $(this).data('ref');
+            if (!ref) return;
+
+            const modal = new bootstrap.Modal(document.getElementById('priceBreakdownModal'));
+            const body = $('#priceBreakdownBody');
+            const footer = $('#priceBreakdownFooter');
+
+            // Show loading
+            body.html(`
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading price breakdown...</p>
+                </div>
+            `);
+            footer.html('<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>');
+
+            modal.show();
+
+            $.ajax({
+                url: 'assets/includes/get-price-breakdown.php',
+                type: 'GET',
+                dataType: 'json',
+                data: { reference: ref },
+                success: function (res) {
+                    if (!res.success) {
+                        body.html('<div class="alert alert-danger">'
+                            + (res.message || 'Failed to load breakdown') + '</div>');
+                        return;
+                    }
+
+                    const d = res.data;
+                    const fmt = (n) => parseFloat(n).toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                    // Build header info
+                    let html = `
+                        <div class="breakdown-header-info">
+                            <div class="d-flex justify-content-between flex-wrap gap-2">
+                                <div>
+                                    <div class="bh-label">Reference</div>
+                                    <div class="bh-value">${d.reference_number}</div>
+                                </div>
+                                <div>
+                                    <div class="bh-label">Customer</div>
+                                    <div class="bh-value">${d.customer_name || '-'}</div>
+                                </div>
+                                <div>
+                                    <div class="bh-label">Vehicle</div>
+                                    <div class="bh-value">${d.vehicle_number || '-'} (${d.vehicle_type || '-'})</div>
+                                </div>
+                               
+                            </div>
+                        </div>
+                    `;
+
+                    // Build breakdown table
+                    html += '<table class="breakdown-table">';
+
+                    // Parking duration
+                    html += `
+                        <tr>
+                            <th><i class="bi bi-calendar3 me-2"></i>Parking Duration</th>
+                            <td>${d.days} day(s)</td>
+                        </tr>
+                        <tr>
+                            <th><i class="bi bi-tag me-2"></i>Rate per Day</th>
+                            <td>LKR ${fmt(d.price_per_day)}</td>
+                        </tr>
+                        <tr>
+                            <th><i class="bi bi-car-front me-2"></i>Base Parking Cost</th>
+                            <td>LKR ${fmt(d.base_parking_cost)}</td>
+                        </tr>
+                    `;
+
+                    // Extra services
+                    if (d.extras && d.extras.length > 0) {
+                        d.extras.forEach(function (extra) {
+                            html += `
+                                <tr class="extras-row">
+                                    <th><i class="bi bi-plus-circle me-2"></i>${extra.name}</th>
+                                    <td>LKR ${fmt(extra.price)}</td>
+                                </tr>
+                            `;
+                        });
+                    }
+
+                    // Original total
+                    html += `
+                        <tr class="total-row">
+                            <th><i class="bi bi-cash-stack me-2"></i>Original Total</th>
+                            <td>LKR ${fmt(d.original_total)}</td>
+                        </tr>
+                    `;
+
+                    // Late fee (if any)
+                    if (d.late_fee_amount > 0) {
+                        html += `
+                            <tr class="late-fee-row">
+                                <th><i class="bi bi-exclamation-triangle me-2"></i>Late Fee </th>
+                                <td>LKR ${fmt(d.late_fee_amount)}</td>
+                            </tr>
+                        `;
+                    }
+
+                    // Final total (if different from original)
+                    if (d.final_total > 0 && d.final_total !== d.original_total) {
+                        html += `
+                            <tr class="final-row">
+                                <th><i class="bi bi-cash-coin me-2"></i>Grand Total</th>
+                                <td>LKR ${fmt(d.final_total)}</td>
+                            </tr>
+                        `;
+
+                        const balance = d.final_total - d.original_total;
+                        // if (balance > 0) {
+                        //     html += `
+                        //         <tr>
+                        //             <th><i class="bi bi-arrow-right-circle me-2"></i>Balance Due at Checkout</th>
+                        //             <td style="color:#dc3545;font-weight:700;">LKR ${fmt(balance)}</td>
+                        //         </tr>
+                        //     `;
+                        // }
+                    }
+
+                    html += '</table>';
+
+                    // Date info
+                    html += `
+                        <div class="mt-3 px-2" style="font-size:11px; color:#6c757d;">
+                            <div class="d-flex justify-content-between">
+                                <span><i class="bi bi-calendar-event me-1"></i>Start: ${d.start_date || '-'}</span>
+                                <span><i class="bi bi-calendar-check me-1"></i>End: ${d.end_date_edited || d.end_date || '-'}</span>
+                            </div>
+                        </div>
+                    `;
+
+                    body.html(html);
+
+                    if (d.pdf_url) {
+                        footer.html(`
+                            <a href="${d.pdf_url}" target="_blank" rel="noopener noreferrer" class="btn btn-danger btn-sm me-auto">
+                                <i class="bi bi-file-earmark-pdf me-1"></i> View PDF
+                            </a>
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                        `);
+                    }
+                },
+                error: function () {
+                    body.html('<div class="alert alert-danger">Server error while loading price breakdown.</div>');
+                }
+            });
+        });
     });
 </script>
 
