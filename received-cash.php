@@ -21,7 +21,7 @@
                         WHEN LOWER(TRIM(ch.status)) = 'check_in'
                             THEN COALESCE(rs.total_price_final, rs.total_price, 0)
                         WHEN LOWER(TRIM(ch.status)) = 'check_out'
-                            THEN COALESCE(rs.total_price_final, 0) - COALESCE(rs.total_price, 0)
+                            THEN COALESCE(rs.total_price_final, rs.total_price, 0)
                         ELSE 0
                     END
                 ) AS total_amount,
@@ -37,7 +37,7 @@
                 SUM(
                     CASE
                         WHEN LOWER(TRIM(ch.status)) = 'check_out'
-                            THEN COALESCE(rs.total_price_final, 0) - COALESCE(rs.total_price, 0)
+                            THEN COALESCE(rs.total_price_final, rs.total_price, 0)
                         ELSE 0
                     END
                 ) AS checkout_amount,
@@ -87,14 +87,8 @@
                         CASE
                             WHEN LOWER(TRIM(ch.status)) = 'check_in'
                                 THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-
-                            WHEN LOWER(TRIM(ch.status)) = 'check_out'
-                                AND ROUND(COALESCE(rs.total_price_final, 0), 2) != ROUND(COALESCE(rs.total_price, 0), 2)
-                                THEN COALESCE(rs.total_price_final, 0) - COALESCE(rs.total_price, 0)
-
                             WHEN LOWER(TRIM(ch.status)) = 'check_out'
                                 THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-
                             ELSE 0
                         END
                     ) AS total_amount,
@@ -108,12 +102,7 @@
                     SUM(
                         CASE
                             WHEN LOWER(TRIM(ch.status)) = 'check_out'
-                                AND ROUND(COALESCE(rs.total_price_final, 0), 2) != ROUND(COALESCE(rs.total_price, 0), 2)
-                                THEN COALESCE(rs.total_price_final, 0) - COALESCE(rs.total_price, 0)
-
-                            WHEN LOWER(TRIM(ch.status)) = 'check_out'
                                 THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-
                             ELSE 0
                         END
                     ) AS checkout_amount,
