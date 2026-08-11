@@ -5,18 +5,21 @@ require_once __DIR__ . '/assets/includes/db_connect.php';
 try {
     $stmt = $conn->query("
         SELECT
-            id,
-            reference_number,
-            check_in_datetime,
-            check_in_by_name,
-            check_out_datetime,
-            check_out_by_name,
-            created_at,
-            updated_at,
-            status
-        FROM customer_handling
-        WHERE status = 'check_in'
-        ORDER BY check_in_datetime DESC
+            ch.id,
+            ch.reference_number,
+            ch.check_in_datetime,
+            ch.check_in_by_name,
+            ch.check_out_datetime,
+            ch.check_out_by_name,
+            ch.created_at,
+            ch.updated_at,
+            ch.status
+        FROM customer_handling ch
+        INNER JOIN reserved_slots rs ON rs.reference_number = ch.reference_number
+        WHERE ch.status = 'check_in'
+          AND rs.is_no_show = 0
+          AND rs.is_trashed = 0
+        ORDER BY ch.check_in_datetime DESC
     ");
     $parkedVehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
