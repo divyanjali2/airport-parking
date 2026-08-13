@@ -45,15 +45,7 @@ try {
             ON rs.reference_number = ch.reference_number
 
         WHERE
-            (
-                ch.status = 'check_in'
-                OR (
-                    ch.status = 'check_out'
-                    AND rs.total_price_final IS NOT NULL
-                    AND rs.total_price_final != rs.total_price
-                    AND rs.cash_handover = 0
-                )
-            )
+            ch.status = 'check_in'
             AND rs.is_trashed = 0
             AND rs.is_no_show = 0
             AND rs.booking_status = 'confirmed'
@@ -62,6 +54,47 @@ try {
     ");
 
     $cashHandovers = $cashStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // ── CHECKOUT BOOKINGS - PENDING HANDOVER ──
+    $checkoutPendingStmt = $conn->query("
+        SELECT
+            ch.id AS customer_handling_id,
+            ch.reference_number,
+            ch.check_in_datetime,
+            ch.check_in_by_name,
+            ch.check_out_datetime,
+            ch.check_out_by_name,
+            ch.status,
+
+            rs.id AS reserved_slot_id,
+            rs.name AS customer_name,
+            rs.whatsapp_number,
+            rs.total_price,
+            rs.total_price_final,
+            rs.cash_handover,
+            rs.cash_handover_checkin,
+            rs.handover_datetime,
+            rs.handover_by,
+            rs.cash_received_status,
+            rs.late_fee_amount,
+
+            COALESCE(rs.total_price_final, rs.total_price) AS cash_collected
+
+        FROM customer_handling ch
+        INNER JOIN reserved_slots rs
+            ON rs.reference_number = ch.reference_number
+
+        WHERE
+            ch.status = 'check_out'
+            AND rs.cash_handover = 0
+            AND rs.is_trashed = 0
+            AND rs.is_no_show = 0
+            AND rs.booking_status = 'confirmed'
+
+        ORDER BY ch.check_out_datetime DESC
+    ");
+
+    $checkoutPendingHandovers = $checkoutPendingStmt->fetchAll(PDO::FETCH_ASSOC);
 
     // ── COMPLETED HANDOVERS (Both Check-in and Check-out) ──
     $completedStmt = $conn->query("
@@ -118,6 +151,7 @@ try {
 }
 
 $totalPendingCash = array_sum(array_column($cashHandovers, 'cash_collected'));
+$totalCheckoutPendingCash = array_sum(array_column($checkoutPendingHandovers, 'cash_collected'));
 $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collected'));
 ?>
 <!DOCTYPE html>
@@ -644,7 +678,7 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                 <?php endif; ?>
                             </tbody>
 
-                            <tfoot>
+                            <!-- <tfoot>
                                 <tr class="total-row">
                                     <td colspan="15" class="text-end">
                                         <i class="bi bi-cash-stack me-1"></i> Total Pending Cash
@@ -653,12 +687,164 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                         LKR <?= number_format((float)$totalPendingCash, 2) ?>
                                     </td>
                                 </tr>
-                            </tfoot>
+                            </tfoot> -->
                         </table>
                     </div>
                 </form>
 
             </div><!-- /dashboard-card -->
+
+            <!-- ════════════════════════════════════════════════════════════════ -->
+            <!-- CHECKOUT BOOKINGS — PENDING CASH HANDOVER                      -->
+            <!-- ════════════════════════════════════════════════════════════════ -->
+            <div class="card dashboard-card" style="border-left: 4px solid #ff9800;">
+
+                <h2 class="text-center fw-bold" style="color: #e65100;">
+                    <i class="bi bi-box-arrow-right me-2"></i> Checkout Bookings — Pending Cash Handover
+                </h2>
+
+                <!-- ── Table ── -->
+                <form id="checkoutHandoverForm">
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                        <div>
+                            <span class="badge bg-warning text-dark" style="font-size:12px;">⚠️ These bookings have been checked out but cash has not been handed over yet</span>
+                        </div>
+                        <button type="submit" id="saveCheckoutHandover" class="btn btn-warning fw-bold">
+                            <i class="bi bi-save me-1"></i> Save Handover
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="checkoutPendingTable" class="table table-bordered table-striped align-middle">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Select</th>
+                                    <th>#</th>
+                                    <th>Reference No</th>
+                                    <th>Customer</th>
+                                    <th>WhatsApp</th>
+                                    <th>Check In Date/Time</th>
+                                    <th>Check In By</th>
+                                    <th>Check Out Date/Time</th>
+                                    <th>Check Out By</th>
+                                    <th>Original Price (LKR)</th>
+                                    <th>Late Fee (LKR)</th>
+                                    <th>Final Price (LKR)</th>
+                                    <th>Payment Type</th>
+                                    <th>Check-in Handover</th>
+                                    <th class="text-end">Cash Collected (LKR)</th>
+                                    <th>Finance Status</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                <?php if (!empty($checkoutPendingHandovers)): ?>
+                                    <?php foreach ($checkoutPendingHandovers as $index => $row): ?>
+                                        <?php
+                                            $originalPrice        = (float)($row['total_price']       ?? 0);
+                                            $finalPrice           = (float)($row['total_price_final'] ?? 0);
+                                            $lateFee              = (float)($row['late_fee_amount']   ?? 0);
+                                            $cashCollected        = (float)($row['cash_collected']    ?? 0);
+                                            $checkInHandoverDone  = !empty($row['cash_handover_checkin']);
+                                        ?>
+                                        <tr>
+                                            <!-- Checkbox -->
+                                            <td class="text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    class="checkout-handover-check"
+                                                    value="<?= $row['reserved_slot_id'] ?>"
+                                                    data-amount="<?= $cashCollected ?>">
+                                            </td>
+
+                                            <td><?= $index + 1 ?></td>
+
+                                            <td class="fw-bold text-primary">
+                                                <span class="ref-link" data-ref="<?= htmlspecialchars($row['reference_number'] ?? '') ?>" title="Click to view price breakdown">
+                                                    <?= htmlspecialchars($row['reference_number'] ?? '-') ?>
+                                                </span>
+                                            </td>
+
+                                            <td><?= htmlspecialchars($row['customer_name'] ?? '-') ?></td>
+
+                                            <td><?= htmlspecialchars($row['whatsapp_number'] ?? '-') ?></td>
+
+                                            <td><?= htmlspecialchars($row['check_in_datetime'] ?? '-') ?></td>
+
+                                            <td><?= htmlspecialchars($row['check_in_by_name'] ?? '-') ?></td>
+
+                                            <td><?= htmlspecialchars($row['check_out_datetime'] ?? '-') ?></td>
+
+                                            <td><?= htmlspecialchars($row['check_out_by_name'] ?? '-') ?></td>
+
+                                            <!-- Original Price -->
+                                            <td class="text-end">
+                                                <?= number_format($originalPrice, 2) ?>
+                                            </td>
+
+                                            <!-- Late Fee -->
+                                            <td class="text-end">
+                                                <?php if ($lateFee > 0): ?>
+                                                    <span class="text-danger fw-bold"><?= number_format($lateFee, 2) ?></span>
+                                                <?php else: ?>
+                                                    <span class="text-muted">—</span>
+                                                <?php endif; ?>
+                                            </td>
+
+                                            <!-- Final Price -->
+                                            <td class="text-end">
+                                                <?php if ($finalPrice > 0): ?>
+                                                    <span class="balance-amount">
+                                                        <?= number_format($finalPrice, 2) ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="text-muted">—</span>
+                                                <?php endif; ?>
+                                            </td>
+
+                                            <td>Cash</td>
+
+                                            <!-- Check-in Handover Status -->
+                                            <td class="text-center">
+                                                <?php if ($checkInHandoverDone): ?>
+                                                    <span class="handover-status handover-done">
+                                                        <i class="bi bi-check-circle"></i> Done
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="handover-status handover-pending">
+                                                        <i class="bi bi-clock"></i> Pending
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
+
+                                            <!-- Cash Collected -->
+                                            <td class="text-end fw-bold">
+                                                <span class="balance-amount">
+                                                    <?= number_format($cashCollected, 2) ?>
+                                                </span>
+                                            </td>
+
+                                            <!-- Finance Status -->
+                                            <td class="text-center">
+                                                <?php if (($row['cash_received_status'] ?? '') === 'accepted'): ?>
+                                                    <span class="badge bg-success">
+                                                        <i class="bi bi-check-circle me-1"></i>Accepted
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-warning text-dark">
+                                                        <i class="bi bi-clock me-1"></i>Pending
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </form>
+
+            </div><!-- /checkout-pending-card -->
 
             <!-- ════════════════════════════════════════════════════════════════ -->
             <!-- COMPLETED HANDOVERS (Both Check-In and Check-Out Combined) -->
@@ -906,17 +1092,38 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
             order: [[7, 'desc']], // sort by handover datetime
         });
 
-        // ── Live total from checked checkboxes ──
+        // ── DataTable for Checkout Pending ──
+        $('#checkoutPendingTable').DataTable({
+            pageLength: 10,
+            lengthMenu: [10, 25, 50, 100],
+            responsive: true,
+            order: [[7, 'desc']], // sort by check-out datetime
+            columnDefs: [
+                { orderable: false, targets: [0] }, // checkbox col
+            ],
+        });
+
+        // ── Live total from checked checkboxes (Check-in table) ──
         $(document).on('change', '.cash-handover-check', function () {
             let total = 0;
             $('.cash-handover-check:checked').each(function () {
                 total += parseFloat($(this).data('amount')) || 0;
             });
             
-            console.log('Total selected: LKR ' + total.toFixed(2));
+            console.log('Check-in total selected: LKR ' + total.toFixed(2));
         });
 
-        // ── Cash Handover Form Submit ──
+        // ── Live total from checked checkboxes (Checkout table) ──
+        $(document).on('change', '.checkout-handover-check', function () {
+            let total = 0;
+            $('.checkout-handover-check:checked').each(function () {
+                total += parseFloat($(this).data('amount')) || 0;
+            });
+            
+            console.log('Checkout total selected: LKR ' + total.toFixed(2));
+        });
+
+        // ── Cash Handover Form Submit (Check-in table) ──
         $(document).on('submit', '#cashHandoverForm', function (e) {
             e.preventDefault();
 
@@ -959,6 +1166,53 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                 error: function (xhr, status, error) {
                     alert('❌ Server error while saving cash handover.\n\n' + error);
                     $('#saveCashHandover').prop('disabled', false).html(
+                        '<i class="bi bi-save me-1"></i> Save Handover'
+                    );
+                }
+            });
+        });
+
+        // ── Cash Handover Form Submit (Checkout table) ──
+        $(document).on('submit', '#checkoutHandoverForm', function (e) {
+            e.preventDefault();
+
+            const bookingIds = [];
+            $('.checkout-handover-check:checked').each(function () {
+                bookingIds.push($(this).val());
+            });
+
+            if (bookingIds.length === 0) {
+                alert('⚠️ Please select at least one checkout booking.');
+                return;
+            }
+
+            $('#saveCheckoutHandover').prop('disabled', true).html(
+                '<i class="bi bi-hourglass-split me-1"></i> Processing...'
+            );
+
+            $.ajax({
+                url: 'assets/includes/save-cash-handover.php',
+                type: 'POST',
+                dataType: 'json',
+                data: { booking_ids: bookingIds },
+                success: function (res) {
+                    if (res.success) {
+                        const successMsg = `✅ Checkout cash handover processed successfully!\n\n` +
+                            `Records processed: ${bookingIds.length}\n\n` +
+                            `The page will reload now.`;
+                        
+                        alert(successMsg);
+                        location.reload();
+                    } else {
+                        alert('❌ ' + (res.message || 'Failed to save cash handover.'));
+                        $('#saveCheckoutHandover').prop('disabled', false).html(
+                            '<i class="bi bi-save me-1"></i> Save Handover'
+                        );
+                    }
+                },
+                error: function (xhr, status, error) {
+                    alert('❌ Server error while saving cash handover.\n\n' + error);
+                    $('#saveCheckoutHandover').prop('disabled', false).html(
                         '<i class="bi bi-save me-1"></i> Save Handover'
                     );
                 }
