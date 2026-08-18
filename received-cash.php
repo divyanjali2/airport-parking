@@ -9,126 +9,103 @@
 
     try {
         $stmt = $conn->query("
-            SELECT
-                rs.handover_batch,
-                rs.handover_datetime,
-                rs.handover_by,
-                u.name AS handover_by_name,
-                COUNT(*) AS booking_count,
-
-                SUM(
-                    CASE
-                        WHEN LOWER(TRIM(ch.status)) = 'check_in'
-                            THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-                        WHEN LOWER(TRIM(ch.status)) = 'check_out'
-                            THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-                        ELSE 0
-                    END
-                ) AS total_amount,
-
-                SUM(
-                    CASE
-                        WHEN LOWER(TRIM(ch.status)) = 'check_in'
-                            THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-                        ELSE 0
-                    END
-                ) AS checkin_amount,
-
-                SUM(
-                    CASE
-                        WHEN LOWER(TRIM(ch.status)) = 'check_out'
-                            THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-                        ELSE 0
-                    END
-                ) AS checkout_amount,
-
-                GROUP_CONCAT(rs.reference_number ORDER BY rs.reference_number SEPARATOR ', ') AS reference_numbers
-
-            FROM reserved_slots rs
-
-            INNER JOIN customer_handling ch
-                ON TRIM(ch.reference_number) = TRIM(rs.reference_number)
-
-            LEFT JOIN users u 
-                ON u.id = rs.handover_by
-
-            WHERE rs.is_trashed = 0
-            AND rs.is_no_show = 0
-            AND rs.cash_handover = 1
-            AND rs.booking_status = 'confirmed'
-            AND (rs.cash_received_status IS NULL OR rs.cash_received_status = 'pending')
-            AND (
-                LOWER(TRIM(ch.status)) = 'check_in'
-                OR LOWER(TRIM(ch.status)) = 'check_out'
-            )
-
-            GROUP BY 
-                rs.handover_batch,
-                rs.handover_datetime,
-                rs.handover_by,
-                u.name
-
-            ORDER BY rs.handover_datetime DESC
-        ");
-
-        $handovers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $stmtAccepted = $conn->query("
+            (
                 SELECT
+                    'checkin' AS handover_type,
+                    rs.checkin_handover_batch AS handover_batch,
+                    rs.cash_handover_checkin AS handover_datetime,
+                    u1.name AS handover_by_name,
+                    COUNT(*) AS booking_count,
+                    SUM(COALESCE(rs.cash_handover_checkin_amount, 0)) AS total_amount,
+                    GROUP_CONCAT(rs.reference_number ORDER BY rs.reference_number SEPARATOR ', ') AS reference_numbers,
+                    'Check-In Amount' AS handover_label
+                FROM reserved_slots rs
+                LEFT JOIN users u1 ON u1.id = rs.checkin_handover_by
+                WHERE rs.is_trashed = 0 AND rs.is_no_show = 0
+                AND rs.booking_status = 'confirmed'
+                AND rs.checkin_handover_batch IS NOT NULL
+                AND rs.checkin_received_status = 'pending'
+                GROUP BY rs.checkin_handover_batch, rs.cash_handover_checkin, u1.name
+            )
+            UNION ALL
+            (
+                SELECT
+                    'checkout' AS handover_type,
                     rs.handover_batch,
                     rs.handover_datetime,
-                    rs.handover_by,
-                    u1.name AS handover_by_name,
-                    rs.cash_received_datetime,
-                    rs.cash_received_by,
-                    u2.name AS received_by_name,
+                    u2.name AS handover_by_name,
                     COUNT(*) AS booking_count,
                     SUM(
-                        CASE
-                            WHEN LOWER(TRIM(ch.status)) = 'check_in'
-                                THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-                            WHEN LOWER(TRIM(ch.status)) = 'check_out'
-                                THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-                            ELSE 0
+                        CASE WHEN rs.late_fee_amount > 0
+                            THEN rs.late_fee_amount
+                            ELSE COALESCE(rs.total_price_final, rs.total_price, 0)
                         END
                     ) AS total_amount,
-                    SUM(
-                        CASE
-                            WHEN LOWER(TRIM(ch.status)) = 'check_in'
-                                THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-                            ELSE 0
-                        END
-                    ) AS checkin_amount,
-                    SUM(
-                        CASE
-                            WHEN LOWER(TRIM(ch.status)) = 'check_out'
-                                THEN COALESCE(rs.total_price_final, rs.total_price, 0)
-                            ELSE 0
-                        END
-                    ) AS checkout_amount,
-                    GROUP_CONCAT(rs.reference_number ORDER BY rs.reference_number SEPARATOR ', ') AS reference_numbers
+                    GROUP_CONCAT(rs.reference_number ORDER BY rs.reference_number SEPARATOR ', ') AS reference_numbers,
+                    MAX(CASE WHEN rs.late_fee_amount > 0 THEN 'Late Fee' ELSE 'Checkout Amount' END) AS handover_label
                 FROM reserved_slots rs
-                INNER JOIN customer_handling ch
-                    ON TRIM(ch.reference_number) = TRIM(rs.reference_number)
-                LEFT JOIN users u1 ON u1.id = rs.handover_by
-                LEFT JOIN users u2 ON u2.id = rs.cash_received_by
-                WHERE rs.is_trashed = 0
-                AND rs.is_no_show = 0
+                LEFT JOIN users u2 ON u2.id = rs.handover_by
+                WHERE rs.is_trashed = 0 AND rs.is_no_show = 0
                 AND rs.cash_handover = 1
                 AND rs.booking_status = 'confirmed'
-                AND rs.cash_received_status = 'accepted'
-                GROUP BY 
-                    rs.handover_batch,
-                    rs.handover_datetime,
-                    rs.handover_by,
-                    u1.name,
-                    rs.cash_received_datetime,
-                    rs.cash_received_by,
-                    u2.name
-                ORDER BY rs.cash_received_datetime DESC
-            ");
+                AND (rs.cash_received_status IS NULL OR rs.cash_received_status = 'pending')
+                GROUP BY rs.handover_batch, rs.handover_datetime, u2.name
+            )
+            ORDER BY handover_datetime DESC
+        ");
+        $handovers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $acceptedHandovers = $stmtAccepted->fetchAll(PDO::FETCH_ASSOC);
+$stmtAccepted = $conn->query("
+    (
+        SELECT
+            'checkin' AS handover_type,
+            rs.checkin_handover_batch AS handover_batch,
+            rs.cash_handover_checkin AS handover_datetime,
+            u1.name AS handover_by_name,
+            rs.checkin_received_datetime AS cash_received_datetime,
+            u2.name AS received_by_name,
+            COUNT(*) AS booking_count,
+            SUM(COALESCE(rs.cash_handover_checkin_amount, 0)) AS total_amount,
+            GROUP_CONCAT(rs.reference_number ORDER BY rs.reference_number SEPARATOR ', ') AS reference_numbers,
+            'Check-In Amount' AS handover_label
+        FROM reserved_slots rs
+        LEFT JOIN users u1 ON u1.id = rs.checkin_handover_by
+        LEFT JOIN users u2 ON u2.id = rs.checkin_received_by
+        WHERE rs.is_trashed = 0 AND rs.is_no_show = 0
+          AND rs.booking_status = 'confirmed'
+          AND rs.checkin_received_status = 'accepted'
+        GROUP BY rs.checkin_handover_batch, rs.cash_handover_checkin, u1.name, rs.checkin_received_datetime, u2.name
+    )
+    UNION ALL
+    (
+        SELECT
+            'checkout' AS handover_type,
+            rs.handover_batch,
+            rs.handover_datetime,
+            u3.name AS handover_by_name,
+            rs.cash_received_datetime,
+            u4.name AS received_by_name,
+            COUNT(*) AS booking_count,
+            SUM(
+                CASE WHEN rs.late_fee_amount > 0
+                     THEN rs.late_fee_amount
+                     ELSE COALESCE(rs.total_price_final, rs.total_price, 0)
+                END
+            ) AS total_amount,
+            GROUP_CONCAT(rs.reference_number ORDER BY rs.reference_number SEPARATOR ', ') AS reference_numbers,
+            MAX(CASE WHEN rs.late_fee_amount > 0 THEN 'Late Fee' ELSE 'Checkout Amount' END) AS handover_label
+        FROM reserved_slots rs
+        LEFT JOIN users u3 ON u3.id = rs.handover_by
+        LEFT JOIN users u4 ON u4.id = rs.cash_received_by
+        WHERE rs.is_trashed = 0 AND rs.is_no_show = 0
+          AND rs.cash_handover = 1
+          AND rs.booking_status = 'confirmed'
+          AND rs.cash_received_status = 'accepted'
+        GROUP BY rs.handover_batch, rs.handover_datetime, u3.name, rs.cash_received_datetime, u4.name
+    )
+    ORDER BY cash_received_datetime DESC
+");
+$acceptedHandovers = $stmtAccepted->fetchAll(PDO::FETCH_ASSOC);
 
     } catch (PDOException $e) {
         die('<div style="color:red;">Database error: ' . $e->getMessage() . '</div>');
@@ -267,6 +244,7 @@
                                     <th>#</th>
                                     <th>Handover Date & Time</th>
                                     <th>Handover By</th>
+                                    <th>Type</th>
                                     <th>Booking Count</th>
                                     <th>Reference Numbers</th>
                                     <th>Total Amount (LKR)</th>
@@ -276,6 +254,12 @@
 
                             <tbody>
                                 <?php foreach ($handovers as $i => $h): ?>
+                                    <?php
+                                        $isLateFee = ($h['handover_label'] ?? '') === 'Late Fee';
+                                        $badgeClass = $h['handover_type'] === 'checkin'
+                                            ? 'primary'
+                                            : ($isLateFee ? 'danger' : 'success');
+                                    ?>
                                     <tr>
                                         <td><?= $i + 1 ?></td>
 
@@ -287,14 +271,18 @@
                                         </td>
 
                                         <td><?= htmlspecialchars($h['handover_by_name'] ?? 'Unknown User') ?></td>
+
+                                        <td>
+                                            <span class="badge bg-<?= $badgeClass ?>">
+                                                <?= htmlspecialchars($h['handover_label'] ?? '-') ?>
+                                            </span>
+                                        </td>
+
                                         <td><?= number_format((int)$h['booking_count']) ?></td>
                                         <td><?= htmlspecialchars($h['reference_numbers']) ?></td>
 
                                         <td class="text-end">
-                                            <?php
-                                                $rowTotalAmount = (float)($h['checkin_amount'] ?? 0) + (float)($h['checkout_amount'] ?? 0);
-                                                echo number_format($rowTotalAmount, 2);
-                                            ?>
+                                            <?= number_format((float)($h['total_amount'] ?? 0), 2) ?>
                                         </td>
 
                                         <td>
@@ -302,14 +290,22 @@
                                                 type="button"
                                                 class="btn btn-sm btn-success accept-cash-btn"
                                                 data-batch="<?= htmlspecialchars($h['handover_batch']) ?>"
-                                                data-handover-datetime="<?= htmlspecialchars($h['handover_datetime']) ?>"
-                                                data-amount="<?= number_format((float)$rowTotalAmount, 2) ?>"
+                                                data-type="<?= htmlspecialchars($h['handover_type']) ?>"
+                                                data-amount="<?= number_format((float)($h['total_amount'] ?? 0), 2) ?>"
                                             >
                                                 Accept
                                             </button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
+
+                                <?php if (empty($handovers)): ?>
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted py-4">
+                                            <i class="bi bi-inbox"></i> No pending cash to accept
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -325,6 +321,7 @@
                                     <th>#</th>
                                     <th>Handover Date & Time</th>
                                     <th>Handover By</th>
+                                    <th>Type</th>
                                     <th>Accepted Date & Time</th>
                                     <th>Accepted By</th>
                                     <th>Booking Count</th>
@@ -335,6 +332,12 @@
 
                             <tbody>
                                 <?php foreach ($acceptedHandovers as $i => $a): ?>
+                                    <?php
+                                        $isLateFee = ($a['handover_label'] ?? '') === 'Late Fee';
+                                        $badgeClass = $a['handover_type'] === 'checkin'
+                                            ? 'primary'
+                                            : ($isLateFee ? 'danger' : 'success');
+                                    ?>
                                     <tr>
                                         <td><?= $i + 1 ?></td>
 
@@ -348,6 +351,12 @@
                                         <td><?= htmlspecialchars($a['handover_by_name'] ?? 'Unknown User') ?></td>
 
                                         <td>
+                                            <span class="badge bg-<?= $badgeClass ?>">
+                                                <?= htmlspecialchars($a['handover_label'] ?? '-') ?>
+                                            </span>
+                                        </td>
+
+                                        <td>
                                             <?= !empty($a['cash_received_datetime'])
                                                 ? date('d M Y h:i A', strtotime($a['cash_received_datetime']))
                                                 : 'N/A'
@@ -359,30 +368,28 @@
                                         <td><?= htmlspecialchars($a['reference_numbers']) ?></td>
 
                                         <td class="text-end">
-                                            <?php
-                                                $acceptedCheckinAmount = (float)($a['checkin_amount'] ?? 0);
-                                                $acceptedCheckoutAmount = (float)($a['checkout_amount'] ?? 0);
-                                                $acceptedRowTotal = $acceptedCheckinAmount + $acceptedCheckoutAmount;
-
-                                                if ($acceptedCheckinAmount > 0 && $acceptedCheckoutAmount > 0) {
-                                                    echo htmlspecialchars(number_format($acceptedCheckinAmount, 2) . ' + ' . number_format($acceptedCheckoutAmount, 2));
-                                                } else {
-                                                    echo number_format((float)$acceptedRowTotal, 2);
-                                                }
-                                            ?>
+                                            <?= number_format((float)($a['total_amount'] ?? 0), 2) ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
+
+                                <?php if (empty($acceptedHandovers)): ?>
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted py-4">
+                                            <i class="bi bi-inbox"></i> No accepted cash records yet
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
                             </tbody>
 
                             <tfoot>
                                 <tr class="fw-bold">
-                                    <td colspan="7" class="text-end">Total Accepted Amount</td>
+                                    <td colspan="8" class="text-end">Total Accepted Amount</td>
                                     <td class="text-end">
                                         <?php
                                             $acceptedTotal = 0;
                                             foreach ($acceptedHandovers as $acceptedRow) {
-                                                $acceptedTotal += (float)($acceptedRow['checkin_amount'] ?? 0) + (float)($acceptedRow['checkout_amount'] ?? 0);
+                                                $acceptedTotal += (float)($acceptedRow['total_amount'] ?? 0);
                                             }
                                             echo number_format((float)$acceptedTotal, 2);
                                         ?>
@@ -391,7 +398,6 @@
                             </tfoot>
                         </table>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -408,7 +414,7 @@
 
                     <div class="modal-body">
                         <input type="hidden" id="accept_handover_batch">
-                        <input type="hidden" id="accept_handover_datetime">
+                        <input type="hidden" id="accept_handover_type">
 
                         <p class="text-danger">
                             Confirm the amount listed received to your hand?
@@ -444,7 +450,10 @@
             $('#receivedCashTable').DataTable({
                 pageLength: 50,
                 lengthMenu: [10, 25, 50, 100],
-                order: [[1, 'desc']]
+                order: [[1, 'desc']],
+                columnDefs: [
+                    { orderable: false, targets: [7] } // Action column
+                ]
             });
 
             $('#acceptedCashTable').DataTable({
@@ -461,12 +470,12 @@
         });
 
         $(document).on('click', '.accept-cash-btn', function () {
-            const batch = $(this).data('batch');
-            const handoverDatetime = $(this).data('handover-datetime');
+            const batch  = $(this).data('batch');
+            const type   = $(this).data('type');
             const amount = $(this).data('amount');
 
             $('#accept_handover_batch').val(batch);
-            $('#accept_handover_datetime').val(handoverDatetime);
+            $('#accept_handover_type').val(type);
             $('#accept_amount_display').val('LKR ' + amount);
 
             bootstrap.Modal.getOrCreateInstance(
@@ -478,7 +487,12 @@
             e.preventDefault();
 
             const batch = $('#accept_handover_batch').val();
-            const handoverDatetime = $('#accept_handover_datetime').val();
+            const type  = $('#accept_handover_type').val();
+
+            if (!batch || !type) {
+                alert('Missing batch or type — please close and try again.');
+                return;
+            }
 
             $('#confirmAcceptCashBtn').prop('disabled', true).text('Saving...');
 
@@ -488,7 +502,7 @@
                 dataType: 'json',
                 data: {
                     handover_batch: batch,
-                    handover_datetime: handoverDatetime
+                    type: type
                 },
                 success: function (res) {
                     if (res.success) {

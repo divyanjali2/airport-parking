@@ -42,7 +42,7 @@ try {
 
         WHERE
             (
-                ch.status = 'check_in'
+                (ch.status = 'check_in' AND rs.cash_handover_checkin IS NULL)
                 OR
                 (ch.status = 'check_out' AND rs.cash_handover = 0 AND rs.late_fee_amount > 0)
             )
@@ -88,6 +88,7 @@ try {
             ch.status = 'check_out'
             AND rs.cash_handover = 0
             AND (rs.late_fee_amount IS NULL OR rs.late_fee_amount = 0)
+            AND rs.cash_handover_checkin IS NULL
             AND rs.is_trashed = 0
             AND rs.is_no_show = 0
             AND rs.booking_status = 'confirmed'
@@ -119,6 +120,7 @@ try {
             rs.handover_by,
             rs.cash_received_status,
             rs.cash_received_datetime,
+            rs.late_fee_amount,
 
             CASE
                 WHEN ch.status = 'check_out'
@@ -137,6 +139,13 @@ try {
                 (ch.status = 'check_in' AND rs.cash_handover_checkin IS NOT NULL)
                 OR
                 (ch.status = 'check_out' AND rs.cash_handover = 1 AND rs.handover_datetime IS NOT NULL)
+                OR
+                (
+                    ch.status = 'check_out'
+                    AND rs.cash_handover_checkin IS NOT NULL
+                    AND (rs.late_fee_amount IS NULL OR rs.late_fee_amount = 0)
+                    AND rs.cash_handover = 0
+                )
             )
             AND rs.is_trashed = 0
             AND rs.is_no_show = 0
@@ -444,6 +453,22 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
         #priceBreakdownModal .modal-header .btn-close {
             filter: invert(1);
         }
+
+        .price-disabled {
+            color: #adb5bd;
+            text-decoration: line-through;
+            font-weight: 400;
+            position: relative;
+        }
+
+        .price-disabled-note {
+            display: block;
+            font-size: 9px;
+            color: #adb5bd;
+            text-decoration: none;
+            font-style: italic;
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>
@@ -598,15 +623,15 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                             </td>
 
                                             <!-- Status Badge -->
-                                            <td>
+                                            <!-- Original Price -->
+                                            <td class="text-end">
                                                 <?php if ($isCheckOut): ?>
-                                                    <span class="badge bg-warning text-dark">
-                                                        <i class="bi bi-box-arrow-right me-1"></i>Check Out
+                                                    <span class="price-disabled" title="Not collected here — already handed over at check-in">
+                                                        <?= number_format($originalPrice, 2) ?>
                                                     </span>
+                                                    <span class="price-disabled-note">Late fee only</span>
                                                 <?php else: ?>
-                                                    <span class="badge bg-success">
-                                                        <i class="bi bi-box-arrow-in-right me-1"></i>Check In
-                                                    </span>
+                                                    <?= number_format($originalPrice, 2) ?>
                                                 <?php endif; ?>
                                             </td>
 
