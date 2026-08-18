@@ -28,24 +28,24 @@ try {
             rs.total_price_final,
             rs.cash_handover,
             rs.cash_handover_checkin,
+            rs.cash_handover_checkin_amount,
             rs.handover_datetime,
             rs.handover_by,
             rs.cash_received_status,
+            rs.late_fee_amount,
 
-            CASE
-                WHEN ch.status = 'check_out'
-                    AND rs.total_price_final IS NOT NULL
-                    AND rs.total_price_final != rs.total_price
-                THEN rs.total_price_final - rs.total_price
-                ELSE rs.total_price
-            END AS cash_collected
+            (COALESCE(rs.total_price_final, rs.total_price) - COALESCE(rs.cash_handover_checkin_amount, 0)) AS cash_collected
 
         FROM customer_handling ch
         INNER JOIN reserved_slots rs
             ON rs.reference_number = ch.reference_number
 
         WHERE
-            ch.status = 'check_in'
+            (
+                ch.status = 'check_in'
+                OR
+                (ch.status = 'check_out' AND rs.cash_handover = 0 AND rs.late_fee_amount > 0)
+            )
             AND rs.is_trashed = 0
             AND rs.is_no_show = 0
             AND rs.booking_status = 'confirmed'
@@ -78,7 +78,7 @@ try {
             rs.cash_received_status,
             rs.late_fee_amount,
 
-            COALESCE(rs.total_price_final, rs.total_price) AS cash_collected
+            (COALESCE(rs.total_price_final, rs.total_price) - COALESCE(rs.cash_handover_checkin_amount, 0)) AS cash_collected
 
         FROM customer_handling ch
         INNER JOIN reserved_slots rs
@@ -87,6 +87,7 @@ try {
         WHERE
             ch.status = 'check_out'
             AND rs.cash_handover = 0
+            AND (rs.late_fee_amount IS NULL OR rs.late_fee_amount = 0)
             AND rs.is_trashed = 0
             AND rs.is_no_show = 0
             AND rs.booking_status = 'confirmed'
@@ -529,6 +530,7 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                     <th>Status</th>
                                     <th>Original Price (LKR)</th>
                                     <th>Final Price (LKR)</th>
+                                    <th>Late Fee (LKR)</th>
                                     <th>Payment Type</th>
                                     <th>Handover Status</th>
                                     <th class="text-end">Cash Collected (LKR)</th>
@@ -624,7 +626,19 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                                 <?php endif; ?>
                                             </td>
 
-                                            <td>Cash</td>
+                                             <?php
+                                                $lateFee = (float)($row['late_fee_amount'] ?? 0);
+                                            ?>
+                                            <!-- Late Fee -->
+                                            <td class="text-end">
+                                                <?php if ($lateFee > 0): ?>
+                                                    <span class="text-danger fw-bold"><?= number_format($lateFee, 2) ?></span>
+                                                <?php else: ?>
+                                                    <span class="text-muted">—</span>
+                                                <?php endif; ?>
+                                            </td>
+
+                                            <td>Cash</td>       
 
                                             <!-- Handover Status -->
                                             <td class="text-center">
