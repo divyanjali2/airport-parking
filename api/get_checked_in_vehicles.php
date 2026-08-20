@@ -29,7 +29,10 @@ try {
             ch.check_out_by_name,
             ch.created_at,
             ch.updated_at,
-            ch.status
+            ch.status,
+            rs.start_date,
+            rs.end_date,
+            rs.extra_services
         FROM customer_handling ch
         INNER JOIN reserved_slots rs ON rs.reference_number = ch.reference_number
         WHERE ch.status = 'check_in'
