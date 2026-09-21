@@ -36,13 +36,11 @@
                     u2.name AS handover_by_name,
                     COUNT(*) AS booking_count,
                     SUM(
-                        CASE WHEN rs.late_fee_amount > 0
-                            THEN rs.late_fee_amount
-                            ELSE COALESCE(rs.total_price_final, rs.total_price, 0)
-                        END
+                        COALESCE(rs.total_price_final, rs.total_price, 0)
+                        - COALESCE(rs.cash_handover_checkin_amount, 0)
                     ) AS total_amount,
                     GROUP_CONCAT(rs.reference_number ORDER BY rs.reference_number SEPARATOR ', ') AS reference_numbers,
-                    MAX(CASE WHEN rs.late_fee_amount > 0 THEN 'Late Fee' ELSE 'Checkout Amount' END) AS handover_label
+                    'Checkout Amount' AS handover_label
                 FROM reserved_slots rs
                 LEFT JOIN users u2 ON u2.id = rs.handover_by
                 WHERE rs.is_trashed = 0 AND rs.is_no_show = 0
@@ -87,13 +85,11 @@ $stmtAccepted = $conn->query("
             u4.name AS received_by_name,
             COUNT(*) AS booking_count,
             SUM(
-                CASE WHEN rs.late_fee_amount > 0
-                     THEN rs.late_fee_amount
-                     ELSE COALESCE(rs.total_price_final, rs.total_price, 0)
-                END
+                COALESCE(rs.total_price_final, rs.total_price, 0)
+                - COALESCE(rs.cash_handover_checkin_amount, 0)
             ) AS total_amount,
             GROUP_CONCAT(rs.reference_number ORDER BY rs.reference_number SEPARATOR ', ') AS reference_numbers,
-            MAX(CASE WHEN rs.late_fee_amount > 0 THEN 'Late Fee' ELSE 'Checkout Amount' END) AS handover_label
+            'Checkout Amount' AS handover_label
         FROM reserved_slots rs
         LEFT JOIN users u3 ON u3.id = rs.handover_by
         LEFT JOIN users u4 ON u4.id = rs.cash_received_by

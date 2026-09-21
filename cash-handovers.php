@@ -1,4 +1,5 @@
 <?php
+
 session_start();
 require_once __DIR__ . '/assets/includes/db_connect.php';
 
