@@ -33,6 +33,7 @@ try {
             rs.handover_by,
             rs.cash_received_status,
             rs.late_fee_amount,
+            rs.handover_remark,
 
             (COALESCE(rs.total_price_final, rs.total_price) - COALESCE(rs.cash_handover_checkin_amount, 0)) AS cash_collected
 
@@ -77,6 +78,7 @@ try {
             rs.handover_by,
             rs.cash_received_status,
             rs.late_fee_amount,
+            rs.handover_remark,
 
             (COALESCE(rs.total_price_final, rs.total_price) - COALESCE(rs.cash_handover_checkin_amount, 0)) AS cash_collected
 
@@ -121,6 +123,7 @@ try {
             rs.cash_received_status,
             rs.cash_received_datetime,
             rs.late_fee_amount,
+            rs.handover_remark,
 
             CASE
                 WHEN ch.status = 'check_out'
@@ -175,12 +178,18 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
     <link rel="stylesheet" href="https://cdn.datatables.net/2.1.2/css/dataTables.bootstrap5.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 
     <style>
         body {
             font-family: "Cambria", sans-serif;
             background-color: #f4f6f8;
             font-size: 12px;
+        }
+
+        .swal2-popup {
+            font-family: "Cambria", sans-serif !important;
+            font-size: 13px !important;
         }
 
         .dashboard-card {
@@ -594,7 +603,12 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                                     data-amount="<?= $cashCollected ?>">
                                             </td>
 
-                                            <td><?= $index + 1 ?></td>
+                                            <td>
+                                                <?= $index + 1 ?>
+                                                <?php if (!empty($row['handover_remark'])): ?>
+                                                    <br><small class="text-primary" style="font-size: 10px; display: inline-block; max-width: 150px; word-break: break-word;" title="Handover Remark"><i class="bi bi-chat-left-text me-1"></i><?= htmlspecialchars($row['handover_remark']) ?></small>
+                                                <?php endif; ?>
+                                            </td>
 
                                             <td class="fw-bold text-primary">
                                                 <span class="ref-link" data-ref="<?= htmlspecialchars($row['reference_number'] ?? '') ?>" title="Click to view price breakdown">
@@ -796,7 +810,12 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                                     data-amount="<?= $cashCollected ?>">
                                             </td>
 
-                                            <td><?= $index + 1 ?></td>
+                                            <td>
+                                                <?= $index + 1 ?>
+                                                <?php if (!empty($row['handover_remark'])): ?>
+                                                    <br><small class="text-primary" style="font-size: 10px; display: inline-block; max-width: 150px; word-break: break-word;" title="Handover Remark"><i class="bi bi-chat-left-text me-1"></i><?= htmlspecialchars($row['handover_remark']) ?></small>
+                                                <?php endif; ?>
+                                            </td>
 
                                             <td class="fw-bold text-primary">
                                                 <span class="ref-link" data-ref="<?= htmlspecialchars($row['reference_number'] ?? '') ?>" title="Click to view price breakdown">
@@ -992,6 +1011,9 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
                                             <?= !empty($handoverTime)
                                                 ? htmlspecialchars($handoverTime)
                                                 : '<span class="text-muted">—</span>' ?>
+                                            <?php if (!empty($row['handover_remark'])): ?>
+                                                <br><small class="text-primary" title="Handover Remark"><i class="bi bi-chat-left-text me-1"></i><?= htmlspecialchars($row['handover_remark']) ?></small>
+                                            <?php endif; ?>
                                         </td>
 
                                         <!-- <td>
@@ -1090,6 +1112,61 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
     </div>
 </div>
 
+<!-- Handover Confirmation Modal -->
+<div class="modal fade" id="handoverConfirmModal" tabindex="-1" aria-labelledby="handoverConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0" style="border-radius: 12px; overflow: hidden;">
+            <div class="modal-header text-white" style="background-color: #0a277d;">
+                <h5 class="modal-title fw-bold" id="handoverConfirmModalLabel">
+                    <i class="bi bi-cash-coin me-2"></i> Confirm Cash Handover
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="handoverConfirmForm">
+                <div class="modal-body p-4">
+                    <!-- Summary Card -->
+                    <div class="p-3 mb-3 rounded-3" style="background-color: #f0f4f8; border: 1px solid #d0dbe5;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary fw-semibold">
+                                <i class="bi bi-collection me-1"></i> Bookings Selected:
+                            </span>
+                            <span class="badge bg-primary fs-6 px-3 py-1" id="modalBookingCount">0</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary fw-semibold">
+                                <i class="bi bi-cash-stack me-1"></i> Total Handover Amount:
+                            </span>
+                            <span class="fw-bold text-success fs-5" id="modalTotalAmount">LKR 0.00</span>
+                        </div>
+                       
+                    </div>
+
+                    <!-- Handover Remark (Optional) -->
+                    <div class="mb-3">
+                        <label for="modalHandoverRemark" class="form-label fw-bold" style="color: #0a277d;">
+                            <i class="bi bi-chat-left-dots me-1"></i> Handover Remark <span class="text-muted fw-normal" style="font-size: 11px;">(Optional)</span>
+                        </label>
+                        <textarea class="form-control" id="modalHandoverRemark" name="handover_remark" rows="3" placeholder="Enter any handover remark, notes, or specific comments here..."></textarea>
+                    </div>
+
+                    <div class="alert alert-warning py-2 px-3 small mb-0 d-flex align-items-center" style="font-size: 11px; border-radius: 8px;">
+                        <i class="bi bi-exclamation-circle-fill me-2 fs-5 text-warning flex-shrink-0"></i>
+                        <span>Please confirm that the cash amount shown above has been collected and is ready to be handed over.</span>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color: #f8f9fa;">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-warning btn-sm px-4 fw-bold" id="btnConfirmHandover">
+                        <i class="bi bi-check2-circle me-1"></i> Confirm & Save Handover
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/2.1.2/js/dataTables.js"></script>
@@ -1099,6 +1176,7 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
     $(function () {
@@ -1162,53 +1240,37 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
             console.log('Checkout total selected: LKR ' + total.toFixed(2));
         });
 
+        let activeHandoverBookingIds = [];
+
         // ── Cash Handover Form Submit (Check-in table) ──
         $(document).on('submit', '#cashHandoverForm', function (e) {
             e.preventDefault();
 
             const bookingIds = [];
+            let totalAmount = 0;
             $('.cash-handover-check:checked').each(function () {
                 bookingIds.push($(this).val());
+                totalAmount += parseFloat($(this).data('amount')) || 0;
             });
 
             if (bookingIds.length === 0) {
-                alert('⚠️ Please select at least one booking.');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No Bookings Selected',
+                    text: 'Please select at least one booking to perform handover.',
+                    confirmButtonColor: '#0a277d'
+                });
                 return;
             }
 
-            $('#saveCashHandover').prop('disabled', true).html(
-                '<i class="bi bi-hourglass-split me-1"></i> Processing...'
-            );
+            activeHandoverBookingIds = bookingIds;
 
-            $.ajax({
-                url: 'assets/includes/save-cash-handover.php',
-                type: 'POST',
-                dataType: 'json',
-                data: { booking_ids: bookingIds },
-                success: function (res) {
-                    if (res.success) {
-                        const successMsg = `✅ Cash handover processed successfully!\n\n` +
-                            `Records processed: ${bookingIds.length}\n` +
-                            `Check-in records: Kept in pending\n` +
-                            `Check-out records: Kept/Removed based on price changes\n\n` +
-                            `The page will reload now.`;
-                        
-                        alert(successMsg);
-                        location.reload();
-                    } else {
-                        alert('❌ ' + (res.message || 'Failed to save cash handover.'));
-                        $('#saveCashHandover').prop('disabled', false).html(
-                            '<i class="bi bi-save me-1"></i> Save Handover'
-                        );
-                    }
-                },
-                error: function (xhr, status, error) {
-                    alert('❌ Server error while saving cash handover.\n\n' + error);
-                    $('#saveCashHandover').prop('disabled', false).html(
-                        '<i class="bi bi-save me-1"></i> Save Handover'
-                    );
-                }
-            });
+            $('#modalBookingCount').text(bookingIds.length);
+            $('#modalTotalAmount').text('LKR ' + totalAmount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#modalHandoverTypeBadge').attr('class', 'badge bg-primary').text('Check-in / Mixed Handover');
+            $('#modalHandoverRemark').val('');
+
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('handoverConfirmModal')).show();
         });
 
         // ── Cash Handover Form Submit (Checkout table) ──
@@ -1216,44 +1278,99 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
             e.preventDefault();
 
             const bookingIds = [];
+            let totalAmount = 0;
             $('.checkout-handover-check:checked').each(function () {
                 bookingIds.push($(this).val());
+                totalAmount += parseFloat($(this).data('amount')) || 0;
             });
 
             if (bookingIds.length === 0) {
-                alert('⚠️ Please select at least one checkout booking.');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No Bookings Selected',
+                    text: 'Please select at least one checkout booking to perform handover.',
+                    confirmButtonColor: '#0a277d'
+                });
                 return;
             }
 
-            $('#saveCheckoutHandover').prop('disabled', true).html(
-                '<i class="bi bi-hourglass-split me-1"></i> Processing...'
-            );
+            activeHandoverBookingIds = bookingIds;
+
+            $('#modalBookingCount').text(bookingIds.length);
+            $('#modalTotalAmount').text('LKR ' + totalAmount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#modalHandoverTypeBadge').attr('class', 'badge bg-warning text-dark').text('Checkout Balance Handover');
+            $('#modalHandoverRemark').val('');
+
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('handoverConfirmModal')).show();
+        });
+
+        // ── Handover Confirmation Modal Form Submit ──
+        $(document).on('submit', '#handoverConfirmForm', function (e) {
+            e.preventDefault();
+
+            if (activeHandoverBookingIds.length === 0) {
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('handoverConfirmModal')).hide();
+                return;
+            }
+
+            const remark = $('#modalHandoverRemark').val().trim();
+            const btn = $('#btnConfirmHandover');
+            const originalBtnHtml = btn.html();
+
+            // Hide modal
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('handoverConfirmModal')).hide();
+
+            // Show SweetAlert processing
+            Swal.fire({
+                title: 'Saving Handover...',
+                text: 'Please wait while the cash handover is being processed.',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
 
             $.ajax({
                 url: 'assets/includes/save-cash-handover.php',
                 type: 'POST',
                 dataType: 'json',
-                data: { booking_ids: bookingIds },
+                data: {
+                    booking_ids: activeHandoverBookingIds,
+                    handover_remark: remark
+                },
                 success: function (res) {
                     if (res.success) {
-                        const successMsg = `✅ Checkout cash handover processed successfully!\n\n` +
-                            `Records processed: ${bookingIds.length}\n\n` +
-                            `The page will reload now.`;
-                        
-                        alert(successMsg);
-                        location.reload();
+                        let htmlMsg = `Successfully processed cash handover for <b>${activeHandoverBookingIds.length}</b> booking(s).`;
+                        if (remark) {
+                            htmlMsg += `<br><small class="text-muted mt-2 d-block fst-italic">Remark: "${$('<div>').text(remark).html()}"</small>`;
+                        }
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Handover Successful!',
+                            html: htmlMsg,
+                            confirmButtonColor: '#28a745',
+                            timer: 2500,
+                            timerProgressBar: true
+                        }).then(() => {
+                            location.reload();
+                        });
                     } else {
-                        alert('❌ ' + (res.message || 'Failed to save cash handover.'));
-                        $('#saveCheckoutHandover').prop('disabled', false).html(
-                            '<i class="bi bi-save me-1"></i> Save Handover'
-                        );
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Handover Failed',
+                            text: res.message || 'Failed to save cash handover.',
+                            confirmButtonColor: '#dc3545'
+                        });
                     }
                 },
                 error: function (xhr, status, error) {
-                    alert('❌ Server error while saving cash handover.\n\n' + error);
-                    $('#saveCheckoutHandover').prop('disabled', false).html(
-                        '<i class="bi bi-save me-1"></i> Save Handover'
-                    );
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Server Error',
+                        text: 'Server error while saving cash handover: ' + error,
+                        confirmButtonColor: '#dc3545'
+                    });
                 }
             });
         });

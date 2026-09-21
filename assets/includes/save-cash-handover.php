@@ -14,8 +14,11 @@ if (empty($_POST['booking_ids']) || !is_array($_POST['booking_ids'])) {
     exit;
 }
 
-$userId     = $_SESSION['user_id'];
-$bookingIds = array_map('intval', $_POST['booking_ids']);
+$userId         = $_SESSION['user_id'];
+$bookingIds     = array_map('intval', $_POST['booking_ids']);
+$handoverRemark = isset($_POST['handover_remark']) && trim($_POST['handover_remark']) !== ''
+    ? trim($_POST['handover_remark'])
+    : null;
 
 function nextBatch(PDO $conn, string $column, string $prefix): string
 {
@@ -66,14 +69,15 @@ try {
                 cash_handover_checkin_amount = COALESCE(total_price_final, total_price, 0),
                 checkin_handover_batch = ?,
                 checkin_handover_by = ?,
-                checkin_received_status = 'pending'
+                checkin_received_status = 'pending',
+                handover_remark = COALESCE(?, handover_remark)
             WHERE id IN ($ph2)
               AND booking_status = 'confirmed'
               AND cash_handover_checkin IS NULL
               AND is_trashed = 0
               AND is_no_show = 0
         ");
-        $stmt->execute(array_merge([$batch, $userId], $checkinIds));
+        $stmt->execute(array_merge([$batch, $userId, $handoverRemark], $checkinIds));
         $updatedCount += $stmt->rowCount();
         $batches['checkin'] = $batch;
     }
@@ -91,14 +95,15 @@ try {
                 handover_datetime = NOW(),
                 handover_by = ?,
                 handover_batch = ?,
-                cash_received_status = 'pending'
+                cash_received_status = 'pending',
+                handover_remark = COALESCE(?, handover_remark)
             WHERE id IN ($ph3)
               AND booking_status = 'confirmed'
               AND cash_handover = 0
               AND is_trashed = 0
               AND is_no_show = 0
         ");
-        $stmt->execute(array_merge([$userId, $batch], $checkoutIds));
+        $stmt->execute(array_merge([$userId, $batch, $handoverRemark], $checkoutIds));
         $updatedCount += $stmt->rowCount();
         $batches['checkout'] = $batch;
     }
