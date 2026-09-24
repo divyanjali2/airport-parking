@@ -16,7 +16,9 @@ try {
             ch.status,
             ch.created_at,
             rs.total_price,
-            rs.total_price_final
+            rs.total_price_final,
+            rs.cash_handover,
+            rs.cash_received_status
         FROM customer_handling ch
         LEFT JOIN reserved_slots rs ON rs.id = (
             SELECT rs2.id 
@@ -133,9 +135,9 @@ try {
                                 <th>Check In By</th>
                                 <th>Check Out DateTime</th>
                                 <th>Check Out By</th>
-                                <th>Price (LKR)</th>
                                 <th>Final Price (LKR)</th>
                                 <th>Status</th>
+                                <th>Finance Status</th>
                                 <th>Created At</th>
 
                             </tr>
@@ -147,6 +149,15 @@ try {
                         <?php foreach ($customerHandling as $i => $row): 
                             $price = $row['total_price'] !== null ? (float)$row['total_price'] : 0.00;
                             $finalPrice = !empty($row['total_price_final']) ? (float)$row['total_price_final'] : $price;
+                            
+                            $financeStatus = 'Pending Cash Handover';
+                            if ($row['cash_handover'] == 1) {
+                                if ($row['cash_received_status'] === 'accepted') {
+                                    $financeStatus = 'Accepted by Finance';
+                                } else {
+                                    $financeStatus = 'Cash Handed Over';
+                                }
+                            }
                         ?>
 
                             <tr>
@@ -180,12 +191,6 @@ try {
                                 </td>
 
                                 <td class="text-end"
-                                    data-order="<?= $price ?>"
-                                    data-export="<?= number_format($price, 2, '.', '') ?>">
-                                    <?= number_format($price, 2) ?>
-                                </td>
-
-                                <td class="text-end"
                                     data-order="<?= $finalPrice ?>"
                                     data-export="<?= number_format($finalPrice, 2, '.', '') ?>">
                                     <?= number_format($finalPrice, 2) ?>
@@ -207,6 +212,10 @@ try {
 
                                     <?php endif; ?>
 
+                                </td>
+
+                                <td data-export="<?= htmlspecialchars($financeStatus) ?>">
+                                    <?= htmlspecialchars($financeStatus) ?>
                                 </td>
 
                                 <td data-order="<?= htmlspecialchars($row['created_at'] ?? '') ?>"
@@ -258,7 +267,11 @@ try {
 
             responsive: true,
 
-            order: [[0, 'desc']],
+            order: [[0, 'asc']],
+            
+            columnDefs: [
+                { targets: [8], visible: false } // Hide Finance Status from HTML but keep for export
+            ],
 
             buttons: [
                 {
@@ -267,7 +280,7 @@ try {
                     text: 'Export Excel',
                     title: 'Customer_Handling_List',
                     exportOptions: {
-                        columns: ':visible',
+                        columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                         modifier: { search: 'applied' },
                         format: {
                             body: function (data, row, column, node) {
