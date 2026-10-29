@@ -17,8 +17,11 @@ try {
             ch.created_at,
             rs.total_price,
             rs.total_price_final,
+            rs.late_fee_amount,
             rs.cash_handover,
-            rs.cash_received_status
+            rs.cash_received_status,
+            rs.cash_handover_checkin,
+            rs.checkin_received_status
         FROM customer_handling ch
         LEFT JOIN reserved_slots rs ON rs.id = (
             SELECT rs2.id 
@@ -150,12 +153,39 @@ try {
                             $price = $row['total_price'] !== null ? (float)$row['total_price'] : 0.00;
                             $finalPrice = !empty($row['total_price_final']) ? (float)$row['total_price_final'] : $price;
                             
-                            $financeStatus = 'Pending Cash Handover';
-                            if ($row['cash_handover'] == 1) {
-                                if ($row['cash_received_status'] === 'accepted') {
-                                    $financeStatus = 'Accepted by Finance';
+                            $lateFee = (float)($row['late_fee_amount'] ?? 0);
+                            $hasLateFee = ($lateFee > 0) || ($finalPrice > $price);
+                            $checkinHandoverDone = !empty($row['cash_handover_checkin']);
+                            $checkinAccepted = (($row['checkin_received_status'] ?? '') === 'accepted');
+
+                            $checkoutHandoverDone = (($row['cash_handover'] ?? 0) == 1);
+                            $checkoutAccepted = (($row['cash_received_status'] ?? '') === 'accepted');
+
+                            if ($row['status'] === 'check_in') {
+                                if ($checkinHandoverDone) {
+                                    $financeStatus = $checkinAccepted ? 'Accepted by Finance' : 'Cash Handed Over';
                                 } else {
-                                    $financeStatus = 'Cash Handed Over';
+                                    $financeStatus = 'Pending Cash Handover';
+                                }
+                            } else {
+                                if ($hasLateFee) {
+                                    if ($checkoutHandoverDone) {
+                                        if ($checkoutAccepted && (!$checkinHandoverDone || $checkinAccepted)) {
+                                            $financeStatus = 'Accepted by Finance';
+                                        } else {
+                                            $financeStatus = 'Cash Handed Over';
+                                        }
+                                    } else {
+                                        $financeStatus = 'Pending Cash Handover';
+                                    }
+                                } else {
+                                    if ($checkinHandoverDone) {
+                                        $financeStatus = $checkinAccepted ? 'Accepted by Finance' : 'Cash Handed Over';
+                                    } elseif ($checkoutHandoverDone) {
+                                        $financeStatus = $checkoutAccepted ? 'Accepted by Finance' : 'Cash Handed Over';
+                                    } else {
+                                        $financeStatus = 'Pending Cash Handover';
+                                    }
                                 }
                             }
                         ?>

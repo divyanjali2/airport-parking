@@ -3,7 +3,10 @@
 session_start();
 require_once __DIR__ . '/assets/includes/db_connect.php';
 
-if (!isset($_SESSION['user_id'])) {
+if (
+    !isset($_SESSION['user_id'])
+    || !in_array($_SESSION['user_role'] ?? '', ['admin', 'staff', 'operational-user', 'cashier'], true)
+) {
     header("Location: login.php");
     exit;
 }

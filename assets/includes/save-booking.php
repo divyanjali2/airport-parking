@@ -208,6 +208,16 @@ try {
         ':passportCopy' => $passportCopyUrl,
     ]);
 
+    // Schedule ERP delivery after the booking response has been sent.
+    $erpBookingId = (string) $conn->lastInsertId();
+    try {
+        require_once __DIR__ . '/erp-platform-events.php';
+        \AirportErpEvents\deferBooking($erpBookingId, $reference);
+    } catch (Throwable $notificationError) {
+        error_log('[airport-erp] Booking saved, but ERP notification helper could not run.');
+    }
+
+
     $stmtTotal = $conn->prepare("SELECT days, price_per_day, total_price FROM reserved_slots WHERE reference_number = :ref");
     $stmtTotal->execute([':ref' => $reference]);
     $booking = $stmtTotal->fetch(PDO::FETCH_ASSOC);

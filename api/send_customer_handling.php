@@ -35,10 +35,29 @@ try {
             COALESCE(rs.total_price, 0) AS price,
             rs.cash_handover,
             rs.cash_received_status,
-            CASE 
-                WHEN rs.cash_handover = 1 AND rs.cash_received_status = 'accepted' THEN 'Accepted by Finance'
-                WHEN rs.cash_handover = 1 THEN 'Cash Handed Over'
-                ELSE 'Pending Cash Handover'
+            rs.cash_handover_checkin,
+            rs.checkin_received_status,
+            CASE
+                WHEN ch.status = 'check_in' THEN
+                    CASE
+                        WHEN rs.cash_handover_checkin IS NOT NULL AND rs.checkin_received_status = 'accepted' THEN 'Accepted by Finance'
+                        WHEN rs.cash_handover_checkin IS NOT NULL THEN 'Cash Handed Over'
+                        ELSE 'Pending Cash Handover'
+                    END
+                WHEN (COALESCE(rs.late_fee_amount, 0) > 0 OR COALESCE(rs.total_price_final, rs.total_price) > COALESCE(rs.total_price, 0)) THEN
+                    CASE
+                        WHEN rs.cash_handover = 1 AND rs.cash_received_status = 'accepted' AND (rs.cash_handover_checkin IS NULL OR rs.checkin_received_status = 'accepted') THEN 'Accepted by Finance'
+                        WHEN rs.cash_handover = 1 THEN 'Cash Handed Over'
+                        ELSE 'Pending Cash Handover'
+                    END
+                ELSE
+                    CASE
+                        WHEN rs.cash_handover_checkin IS NOT NULL AND rs.checkin_received_status = 'accepted' THEN 'Accepted by Finance'
+                        WHEN rs.cash_handover_checkin IS NOT NULL THEN 'Cash Handed Over'
+                        WHEN rs.cash_handover = 1 AND rs.cash_received_status = 'accepted' THEN 'Accepted by Finance'
+                        WHEN rs.cash_handover = 1 THEN 'Cash Handed Over'
+                        ELSE 'Pending Cash Handover'
+                    END
             END AS finance_status
         FROM customer_handling ch
         LEFT JOIN reserved_slots rs ON rs.id = (

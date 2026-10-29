@@ -4,7 +4,10 @@ require_once __DIR__ . '/assets/includes/db_connect.php';
 
 date_default_timezone_set('Asia/Colombo');
 
-if (!isset($_SESSION['user_id'])) {
+if (
+    !isset($_SESSION['user_id'])
+    || !in_array($_SESSION['user_role'] ?? '', ['admin', 'staff', 'operational-user', 'cashier'], true)
+) {
     header("Location: login.php");
     exit;
 }
@@ -122,6 +125,8 @@ try {
             rs.handover_by,
             rs.cash_received_status,
             rs.cash_received_datetime,
+            rs.checkin_received_status,
+            rs.checkin_received_datetime,
             rs.late_fee_amount,
             rs.handover_remark,
 
@@ -1042,13 +1047,20 @@ $totalCompletedCash = array_sum(array_column($completedHandovers, 'cash_collecte
 
                                         <!-- Finance Status -->
                                         <td class="text-center">
-                                            <?php if (($row['cash_received_status'] ?? '') === 'accepted'): ?>
+                                            <?php 
+                                                $isFinanceAccepted = (($row['cash_received_status'] ?? '') === 'accepted')
+                                                    || (!empty($row['cash_handover_checkin']) && ($row['checkin_received_status'] ?? '') === 'accepted');
+                                                $financeDatetime = !empty($row['cash_received_datetime']) 
+                                                    ? $row['cash_received_datetime'] 
+                                                    : ($row['checkin_received_datetime'] ?? null);
+                                            ?>
+                                            <?php if ($isFinanceAccepted): ?>
                                                 <span class="badge bg-success">
                                                     <i class="bi bi-check-circle me-1"></i>Accepted
                                                 </span>
-                                                <?php if (!empty($row['cash_received_datetime'])): ?>
+                                                <?php if (!empty($financeDatetime)): ?>
                                                     <br><small class="text-muted" style="font-size:10px;">
-                                                        <?= date('d M Y h:i A', strtotime($row['cash_received_datetime'])) ?>
+                                                        <?= date('d M Y h:i A', strtotime($financeDatetime)) ?>
                                                     </small>
                                                 <?php endif; ?>
                                             <?php else: ?>

@@ -43,7 +43,7 @@
             </li>
         <?php endif; ?>
 
-        <?php if (in_array($role, ['staff', 'admin','operational-user'])): ?>
+        <?php if (in_array($role, ['staff', 'admin','operational-user', 'cashier'], true)): ?>
             <li class="nav-item">
                 <a href="./cash-handover.php" class="nav-link text-white <?= $currentPage === 'cash-handover.php' ? 'active' : '' ?>" aria-current="page">
                     <i class="bi bi-calendar-check me-2"></i> Cash Handover <span class="badge bg-light text-dark ms-2">2</span>
@@ -67,7 +67,7 @@
             </li>
         <?php endif; ?>
 
-        <?php if (in_array($role, ['gm', 'admin'])): ?>
+        <?php if (in_array($role, ['gm', 'senior-management', 'admin'], true)): ?>
             <li class="nav-item">
                 <a href="./reservation-summary.php" class="nav-link text-white <?= $currentPage === 'reservation-summary.php' ? 'active' : '' ?>" aria-current="page">
                     <i class="bi bi-card-checklist me-2"></i> Reservation Summary
@@ -99,7 +99,7 @@
             </li>
         <?php endif; ?>
 
-        <?php if (in_array($role, ['staff', 'admin','operational-user'])): ?>
+        <?php if (in_array($role, ['staff', 'admin','operational-user', 'cashier'], true)): ?>
             <li class="nav-item">
                 <a href="./cash-handovers.php" class="nav-link text-white <?= $currentPage === 'cash-handovers.php' ? 'active' : '' ?>" aria-current="page">
                     <i class="bi bi-cash-stack me-2"></i> Cash Handover Details

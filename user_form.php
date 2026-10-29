@@ -10,6 +10,15 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
 $error = "";
 $id = $_GET['id'] ?? null;
+$roleOptions = [
+    'admin' => 'Admin',
+    'gm' => 'General Manager',
+    'senior-management' => 'Senior Management',
+    'finance' => 'Finance',
+    'cashier' => 'Cashier (Cash Handover User)',
+    'staff' => 'Staff',
+    'operational-user' => 'Operational User'
+];
 $user = [
     'name' => '',
     'email' => '',
@@ -30,11 +39,13 @@ if ($id) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
-    $role = $_POST['role'];
+    $role = $_POST['role'] ?? '';
     $status = $_POST['status'];
     $password = $_POST['password'] ?? '';
 
-    if ($name && $email) {
+    if (!array_key_exists($role, $roleOptions)) {
+        $error = "Please select a valid role.";
+    } elseif ($name && $email) {
         if ($id) {
             // EDIT mode
             $sql = "UPDATE users SET name=:name, email=:email, role=:role, status=:status, updated_at=NOW()";
@@ -121,11 +132,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="col-md-6">
                         <label class="form-label">Role <span class="text-danger">*</span></label>
                         <select name="role" class="form-select" required>
-                            <option value="admin" <?= ($user['role'] === 'admin') ? 'selected' : '' ?>>Admin</option>
-                            <option value="gm" <?= ($user['role'] === 'gm') ? 'selected' : '' ?>>General Manager</option>
-                            <option value="finance" <?= ($user['role'] === 'finance') ? 'selected' : '' ?>>Finance</option>
-                            <option value="staff" <?= ($user['role'] === 'staff') ? 'selected' : '' ?>>Staff</option>
-                            <option value="operational-user" <?= ($user['role'] === 'operational-user') ? 'selected' : '' ?>>Operational User</option>
+                            <?php foreach ($roleOptions as $roleValue => $roleLabel): ?>
+                                <option value="<?= htmlspecialchars($roleValue) ?>" <?= ($user['role'] === $roleValue) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($roleLabel) ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
 

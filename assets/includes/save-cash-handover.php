@@ -4,7 +4,11 @@ require_once __DIR__ . '/db_connect.php';
 
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id'])) {
+if (
+    !isset($_SESSION['user_id'])
+    || !in_array($_SESSION['user_role'] ?? '', ['admin', 'staff', 'operational-user', 'cashier'], true)
+) {
+    http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Unauthorized access.']);
     exit;
 }
