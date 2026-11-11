@@ -5,7 +5,7 @@ require_once __DIR__ . '/../assets/includes/db_connect.php';
 require_once __DIR__ . '/../assets/includes/booking-pricing.php';
 
 try {
-    $promo = \AirportBookingPricing\findPromo($conn, (string)($_POST['code'] ?? ''));
+    $promo = \AirportBookingPricing\findPromo($conn, (string)($_POST['code'] ?? ''), (string)($_POST['startDate'] ?? ''));
     if (!$promo) throw new InvalidArgumentException('Please enter a promo code.');
     echo json_encode(['success' => true, 'promo' => [
         'code' => $promo['code'], 'name' => $promo['name'],

@@ -50,17 +50,22 @@ try {
     $insert = $conn->prepare("INSERT INTO promo_codes (name, code, discount_type, amount, free_shuttle, valid_from, valid_until) VALUES ('Pricing test', ?, 'percentage', 10, 1, '2026-11-13', '2026-11-30')");
     $insert->execute([$code]);
     foreach (['2026-11-13', '2026-11-30'] as $date) {
-        check(findPromo($conn, strtolower($code), new DateTimeImmutable($date))['code'], $code, 'Inclusive validity and normalized code');
+        check(findPromo($conn, strtolower($code), $date . 'T10:00')['code'], $code, 'Inclusive booking start date and normalized code');
     }
-    rejected(fn() => findPromo($conn, $code, new DateTimeImmutable('2026-11-12')), 'Not yet valid');
-    rejected(fn() => findPromo($conn, $code, new DateTimeImmutable('2026-12-01')), 'Expired');
-    rejected(fn() => findPromo($conn, 'MISSING-' . $code), 'Unknown promo');
-    $conn->prepare('UPDATE promo_codes SET valid_from = NULL, valid_until = NULL WHERE code = ?')->execute([$code]);
+    check(findPromo($conn, $code, '2026-11-15T10:00')['code'], $code, 'Advance booking inside promo window');
+    rejected(fn() => findPromo($conn, $code, '2026-11-12T10:00'), 'Booking before promo window');
+    rejected(fn() => findPromo($conn, $code, '2026-12-01T10:00'), 'Booking after promo window');
+    rejected(fn() => findPromo($conn, 'MISSING-' . $code, $start), 'Unknown promo');
+    rejected(fn() => findPromo($conn, $code, ''), 'Missing booking start date');
+    rejected(fn() => findPromo($conn, $code, '2026-02-30T10:00'), 'Invalid promo booking date');
     $data = ['startDate' => $start, 'endDate' => $end, 'promoCode' => $code, 'extras' => ['Shuttle Two Way'], 'totalPrice' => 1, 'pricePerDay' => 1, 'days' => 1];
     $rate = (float)$conn->query('SELECT price FROM per_day_rates ORDER BY id DESC LIMIT 1')->fetchColumn();
     check(quote($conn, $data)['total'], round(2 * $rate * 0.9, 2), 'Server ignores submitted price and days');
+    $data['startDate'] = '2026-12-01T10:00';
+    $data['endDate'] = '2026-12-03T10:00';
+    rejected(fn() => quote($conn, $data), 'Save revalidates changed booking start date');
     $conn->prepare('UPDATE promo_codes SET is_active = 0 WHERE code = ?')->execute([$code]);
-    rejected(fn() => findPromo($conn, $code), 'Inactive');
+    rejected(fn() => findPromo($conn, $code, $start), 'Inactive');
 } finally {
     $conn->rollBack();
 }

@@ -24,7 +24,13 @@
             form = document.getElementById('booking-form');
             refresh = function () { summary.textContent = ''; recalculate(); };
             var button = document.getElementById('apply-promo');
+            var startDate = document.getElementById('start-date');
             input.addEventListener('input', clearPromo);
+            startDate.addEventListener('input', clearPromo);
+            startDate.addEventListener('change', function () {
+                clearPromo();
+                if (input.value.trim()) status.textContent = 'Booking start date changed. Apply the promo code again.';
+            });
             form.addEventListener('reset', function () {
                 clearPromo();
                 setTimeout(refresh, 0);
@@ -39,7 +45,7 @@
                 status.dataset.state = 'checking';
                 try {
                     var response = await fetch(endpoint, {
-                        method: 'POST', body: new URLSearchParams({ code: code })
+                        method: 'POST', body: new URLSearchParams({ code: code, startDate: startDate.value })
                     });
                     var result = await response.json();
                     if (request !== version) return;

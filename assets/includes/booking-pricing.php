@@ -6,7 +6,16 @@ use DateTimeZone;
 use InvalidArgumentException;
 use PDO;
 
-function findPromo(PDO $db, string $code, ?DateTimeImmutable $now = null): ?array
+function parseBookingDate(string $value): DateTimeImmutable
+{
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $value, new DateTimeZone('Asia/Colombo'));
+    if (!$date || $date->format('Y-m-d\TH:i') !== $value) {
+        throw new InvalidArgumentException('Please select a valid booking start and end date.');
+    }
+    return $date;
+}
+
+function findPromo(PDO $db, string $code, string $startValue): ?array
 {
     $code = strtoupper(trim($code));
     if ($code === '') return null;
@@ -14,29 +23,21 @@ function findPromo(PDO $db, string $code, ?DateTimeImmutable $now = null): ?arra
     $query = $db->prepare('SELECT * FROM promo_codes WHERE code = ? LIMIT 1');
     $query->execute([$code]);
     $promo = $query->fetch(PDO::FETCH_ASSOC);
-    $today = ($now ?? new DateTimeImmutable('now', new DateTimeZone('Asia/Colombo')))->format('Y-m-d');
+    $bookingDate = parseBookingDate($startValue)->format('Y-m-d');
     if (!$promo || !$promo['is_active']) throw new InvalidArgumentException('This promo code is invalid or inactive.');
-    if ($promo['valid_from'] && $today < $promo['valid_from']) {
-        throw new InvalidArgumentException('This promo code is valid from ' . $promo['valid_from'] . '.');
+    if ($promo['valid_from'] && $bookingDate < $promo['valid_from']) {
+        throw new InvalidArgumentException('This promo code requires a booking start date on or after ' . $promo['valid_from'] . '.');
     }
-    if ($promo['valid_until'] && $today > $promo['valid_until']) {
-        throw new InvalidArgumentException('This promo code has expired.');
+    if ($promo['valid_until'] && $bookingDate > $promo['valid_until']) {
+        throw new InvalidArgumentException('This promo code requires a booking start date on or before ' . $promo['valid_until'] . '.');
     }
     return $promo;
 }
 
 function calculate(string $startValue, string $endValue, float $rate, array $extras, ?array $promo): array
 {
-    $zone = new DateTimeZone('Asia/Colombo');
-    $parse = static function (string $value) use ($zone): DateTimeImmutable {
-        $date = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $value, $zone);
-        if (!$date || $date->format('Y-m-d\TH:i') !== $value) {
-            throw new InvalidArgumentException('Please select valid booking dates.');
-        }
-        return $date;
-    };
-    $start = $parse($startValue);
-    $end = $parse($endValue);
+    $start = parseBookingDate($startValue);
+    $end = parseBookingDate($endValue);
     $minutes = ($end->getTimestamp() - $start->getTimestamp()) / 60;
     if ($minutes <= 0 || $rate <= 0) throw new InvalidArgumentException('Please select a valid start and end date.');
     // Match the booking form: 2 hours grace, up to 8 hours half a day.
@@ -70,7 +71,7 @@ function calculate(string $startValue, string $endValue, float $rate, array $ext
 
 function quote(PDO $db, array $data): array
 {
-    $promo = findPromo($db, (string)($data['promoCode'] ?? ''));
+    $promo = findPromo($db, (string)($data['promoCode'] ?? ''), (string)($data['startDate'] ?? ''));
     $rate = (float)$db->query('SELECT price FROM per_day_rates ORDER BY id DESC LIMIT 1')->fetchColumn();
     $extras = $data['extras'] ?? [];
     if (!is_array($extras)) throw new InvalidArgumentException('Invalid extra services.');

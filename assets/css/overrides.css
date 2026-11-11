@@ -56,6 +56,7 @@ form input[type=submit] {
 }
 #homePage #booking-modal #promo-status[data-state="error"] {
   color: #b42318;
+  font-size: 14px !important;
 }
 #homePage #booking-modal #promo-shuttle-note {
   color: #128601;
