@@ -269,7 +269,7 @@
                             </div>
 
                             <!-- Outer slots -->
-                            <div class="outer-slots-section">
+                            <div class="outer-slots-section" id="surface-parking-area">
                                 <h4 class="outer-slot-title">Surface Parking Area</h4>
                                 <p class="outer-slot-subtitle">Limited slots available near perimeter</p>
 
@@ -401,14 +401,24 @@
                                         </label>
 
                                         <label class="checkbox-item">
-                                            <input type="checkbox" class="extra-service" value="500" data-name="Shuttle One Way">
+                                            <input type="checkbox" class="extra-service" value="500" data-name="Shuttle One Way" data-group="shuttle">
                                             Shuttle One Way (LKR 500)
                                         </label>
 
                                         <label class="checkbox-item">
-                                            <input type="checkbox" class="extra-service" value="1000" data-name="Shuttle Two Way">
+                                            <input type="checkbox" class="extra-service" value="1000" data-name="Shuttle Two Way" data-group="shuttle">
                                             Shuttle Two Way (LKR 1,000)
                                         </label>
+                                    </div>
+                                    <div class="form-group mt-2">
+                                        <label for="promo-code">Promo code (optional)</label>
+                                        <div class="d-flex gap-2">
+                                            <input type="text" id="promo-code" name="promoCode" maxlength="64" placeholder="Enter promo code" autocomplete="off" aria-describedby="promo-status promo-shuttle-note">
+                                            <button type="button" id="apply-promo" class="btn btn-outline-primary">Apply</button>
+                                        </div>
+                                        <p id="promo-status" role="status" aria-live="polite" class="mb-1"></p>
+                                        <p id="promo-shuttle-note" class="small mb-1">**To receive free shuttle with an eligible promo code, select Shuttle One Way or Shuttle Two Way above. If no shuttle is selected, free shuttle is not included in your booking.</p>
+                                        <p id="promo-savings" role="status" aria-live="polite" class="small mb-1"></p>
                                     </div>
                                     <div class="price-summary mt-2">
                                         <p>
@@ -718,6 +728,7 @@
         });
     </script>
 
+<script src="assets/js/booking-promotions.js"></script>
 <script>
 document.addEventListener(\'DOMContentLoaded\', () => {
     const slots = Array.from(document.querySelectorAll(\'#reserve-slots .slot\'));
@@ -802,7 +813,7 @@ else {
         }
     });
 
-    const totalPrice = chargedDays * PRICE_PER_DAY + extraServicePrice;
+    const totalPrice = window.AirportBookingPromotions.adjust(chargedDays * PRICE_PER_DAY, extraServicePrice);
 
     console.log("CHARGED DAYS:", chargedDays);
     console.log("TOTAL PRICE:", totalPrice);
@@ -820,11 +831,23 @@ else {
         totalPriceText.textContent = bookingPrice.totalPrice.toLocaleString();
     }
 
+    window.AirportBookingPromotions.init(calculatePrice);
     startDateInput.addEventListener(\'change\', calculatePrice);
     endDateInput.addEventListener(\'change\', calculatePrice);
 
     extraServices.forEach(service => {
-        service.addEventListener(\'change\', calculatePrice);
+        service.addEventListener(\'change\', function() {
+            // Toggle behavior: if this checkbox belongs to the shuttle group,
+            // uncheck the other shuttle option when this one is checked
+            if (this.checked && this.dataset.group === \'shuttle\') {
+                extraServices.forEach(other => {
+                    if (other !== this && other.dataset.group === \'shuttle\') {
+                        other.checked = false;
+                    }
+                });
+            }
+            calculatePrice();
+        });
     });
 
     slots.forEach(slot => {
@@ -862,7 +885,7 @@ else {
 
         const bookingPrice = getBookingPrice();
 
-        if (bookingPrice.totalPrice <= 0) {
+        if (bookingPrice.chargedDays <= 0) {
             submitBtn.disabled = false;
             submitBtn.textContent = \'Reserve Now\';
 
@@ -887,7 +910,8 @@ else {
 
             days: bookingPrice.chargedDays,
             pricePerDay: PRICE_PER_DAY,
-            totalPrice: Math.round(bookingPrice.totalPrice),
+            totalPrice: bookingPrice.totalPrice,
+            promoCode: window.AirportBookingPromotions.code(),
 
             extras: Array.from(document.querySelectorAll(\'.extra-service:checked\'))
                 .map(e => e.dataset.name),
@@ -1064,6 +1088,16 @@ else {
                     showRandomOuterAvailability();
 
                     banner.classList.remove(\'d-none\');
+
+                    // Scroll to the Surface Parking Area section with offset above
+                    setTimeout(() => {
+                        const surfaceSection = document.getElementById(\'surface-parking-area\');
+                        if (surfaceSection) {
+                            const yOffset = -150;
+                            const y = surfaceSection.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                            window.scrollTo({ top: y, behavior: \'smooth\' });
+                        }
+                    }, 100);
                 }
             });
         });
@@ -1098,7 +1132,106 @@ else {
             });
         });
     </script>
-</body>',
+</body>
+
+
+
+<div id="flyerPopup" class="flyerPopup">
+  <div class="flyerPopup__backdrop"></div>
+  <div class="flyerPopup__content">
+    <button type="button" class="flyerPopup__close" aria-label="Close">&times;</button>
+
+    <a href="https://api.whatsapp.com/send/?phone=94761414557&text&type=phone_number&app_absent=0"
+       target="_blank"
+       rel="noopener noreferrer">
+      <img src="assets/images/flyer-2.png" alt="Flyer" class="flyerPopup__img">
+    </a>
+  </div>
+</div>
+
+<style>
+.flyerPopup {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flyerPopup[hidden] {
+  display: none;
+}
+
+.flyerPopup__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.flyerPopup__content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90vh;
+}
+
+.flyerPopup__img {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto;
+}
+
+@media (min-width: 992px) {
+  .flyerPopup__content {
+    max-width: 680px;
+    max-height: 82vh;
+  }
+
+  .flyerPopup__img {
+    max-height: 82vh;
+  }
+}
+
+.flyerPopup__close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  color: #111827;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flyerPopup__close:hover {
+  background: #f3f4f6;
+}
+</style> 
+
+<script>
+document.addEventListener(\'DOMContentLoaded\', function () {
+  const flyerPopup = document.getElementById(\'flyerPopup\');
+  const flyerClose = flyerPopup.querySelector(\'.flyerPopup__close\');
+  const flyerBackdrop = flyerPopup.querySelector(\'.flyerPopup__backdrop\');
+
+  function closeFlyer() {
+    flyerPopup.setAttribute(\'hidden\', \'\');
+  }
+
+  flyerClose.addEventListener(\'click\', closeFlyer);
+  flyerBackdrop.addEventListener(\'click\', closeFlyer);
+});
+</script>',
     'richtext' => 1,
     'template' => 2,
     'menuindex' => 0,
@@ -1107,7 +1240,7 @@ else {
     'createdby' => 1,
     'createdon' => 1766399981,
     'editedby' => 1,
-    'editedon' => 1779084495,
+    'editedon' => 1794381491,
     'deleted' => 0,
     'deletedon' => 0,
     'deletedby' => 0,
@@ -1119,7 +1252,7 @@ else {
     'class_key' => 'MODX\\Revolution\\modDocument',
     'context_key' => 'web',
     'content_type' => 1,
-    'uri' => '',
+    'uri' => 'index.html',
     'uri_override' => 0,
     'hide_children_in_tree' => 0,
     'show_in_tree' => 1,
@@ -1264,7 +1397,11 @@ else {
                         <li class="nav-item"><a class="nav-link" href="index.php?id=4">FAQ</a></li>
                         <li class="nav-item"><a class="nav-link" href="index.php?id=5">Gallery</a></li>
                         <li class="nav-item"><a class="nav-link" href="index.php?id=3">Contact</a></li>
-                        <li class="nav-item"><a class="nav-link" href="index.php?id=6">My Account</a></li>
+     <li class="nav-item">
+    <a class="nav-link" href="index.php?id=6" style="white-space: nowrap;">
+        My Account
+    </a>
+</li>
 
                     </ul>
                 </div>
@@ -1542,7 +1679,7 @@ window.addEventListener("scroll", function () {
                             </div>
 
                             <!-- Outer slots -->
-                            <div class="outer-slots-section">
+                            <div class="outer-slots-section" id="surface-parking-area">
                                 <h4 class="outer-slot-title">Surface Parking Area</h4>
                                 <p class="outer-slot-subtitle">Limited slots available near perimeter</p>
 
@@ -1674,14 +1811,24 @@ window.addEventListener("scroll", function () {
                                         </label>
 
                                         <label class="checkbox-item">
-                                            <input type="checkbox" class="extra-service" value="500" data-name="Shuttle One Way">
+                                            <input type="checkbox" class="extra-service" value="500" data-name="Shuttle One Way" data-group="shuttle">
                                             Shuttle One Way (LKR 500)
                                         </label>
 
                                         <label class="checkbox-item">
-                                            <input type="checkbox" class="extra-service" value="1000" data-name="Shuttle Two Way">
+                                            <input type="checkbox" class="extra-service" value="1000" data-name="Shuttle Two Way" data-group="shuttle">
                                             Shuttle Two Way (LKR 1,000)
                                         </label>
+                                    </div>
+                                    <div class="form-group mt-2">
+                                        <label for="promo-code">Promo code (optional)</label>
+                                        <div class="d-flex gap-2">
+                                            <input type="text" id="promo-code" name="promoCode" maxlength="64" placeholder="Enter promo code" autocomplete="off" aria-describedby="promo-status promo-shuttle-note">
+                                            <button type="button" id="apply-promo" class="btn btn-outline-primary">Apply</button>
+                                        </div>
+                                        <p id="promo-status" role="status" aria-live="polite" class="mb-1"></p>
+                                        <p id="promo-shuttle-note" class="small mb-1">**To receive free shuttle with an eligible promo code, select Shuttle One Way or Shuttle Two Way above. If no shuttle is selected, free shuttle is not included in your booking.</p>
+                                        <p id="promo-savings" role="status" aria-live="polite" class="small mb-1"></p>
                                     </div>
                                     <div class="price-summary mt-2">
                                         <p>
@@ -1991,6 +2138,7 @@ window.addEventListener("scroll", function () {
         });
     </script>
 
+<script src="assets/js/booking-promotions.js"></script>
 <script>
 document.addEventListener(\'DOMContentLoaded\', () => {
     const slots = Array.from(document.querySelectorAll(\'#reserve-slots .slot\'));
@@ -2075,7 +2223,7 @@ else {
         }
     });
 
-    const totalPrice = chargedDays * PRICE_PER_DAY + extraServicePrice;
+    const totalPrice = window.AirportBookingPromotions.adjust(chargedDays * PRICE_PER_DAY, extraServicePrice);
 
     console.log("CHARGED DAYS:", chargedDays);
     console.log("TOTAL PRICE:", totalPrice);
@@ -2093,11 +2241,23 @@ else {
         totalPriceText.textContent = bookingPrice.totalPrice.toLocaleString();
     }
 
+    window.AirportBookingPromotions.init(calculatePrice);
     startDateInput.addEventListener(\'change\', calculatePrice);
     endDateInput.addEventListener(\'change\', calculatePrice);
 
     extraServices.forEach(service => {
-        service.addEventListener(\'change\', calculatePrice);
+        service.addEventListener(\'change\', function() {
+            // Toggle behavior: if this checkbox belongs to the shuttle group,
+            // uncheck the other shuttle option when this one is checked
+            if (this.checked && this.dataset.group === \'shuttle\') {
+                extraServices.forEach(other => {
+                    if (other !== this && other.dataset.group === \'shuttle\') {
+                        other.checked = false;
+                    }
+                });
+            }
+            calculatePrice();
+        });
     });
 
     slots.forEach(slot => {
@@ -2135,7 +2295,7 @@ else {
 
         const bookingPrice = getBookingPrice();
 
-        if (bookingPrice.totalPrice <= 0) {
+        if (bookingPrice.chargedDays <= 0) {
             submitBtn.disabled = false;
             submitBtn.textContent = \'Reserve Now\';
 
@@ -2160,7 +2320,8 @@ else {
 
             days: bookingPrice.chargedDays,
             pricePerDay: PRICE_PER_DAY,
-            totalPrice: Math.round(bookingPrice.totalPrice),
+            totalPrice: bookingPrice.totalPrice,
+            promoCode: window.AirportBookingPromotions.code(),
 
             extras: Array.from(document.querySelectorAll(\'.extra-service:checked\'))
                 .map(e => e.dataset.name),
@@ -2337,6 +2498,16 @@ else {
                     showRandomOuterAvailability();
 
                     banner.classList.remove(\'d-none\');
+
+                    // Scroll to the Surface Parking Area section with offset above
+                    setTimeout(() => {
+                        const surfaceSection = document.getElementById(\'surface-parking-area\');
+                        if (surfaceSection) {
+                            const yOffset = -150;
+                            const y = surfaceSection.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                            window.scrollTo({ top: y, behavior: \'smooth\' });
+                        }
+                    }, 100);
                 }
             });
         });
@@ -2372,6 +2543,105 @@ else {
         });
     </script>
 </body>
+
+
+
+<div id="flyerPopup" class="flyerPopup">
+  <div class="flyerPopup__backdrop"></div>
+  <div class="flyerPopup__content">
+    <button type="button" class="flyerPopup__close" aria-label="Close">&times;</button>
+
+    <a href="https://api.whatsapp.com/send/?phone=94761414557&text&type=phone_number&app_absent=0"
+       target="_blank"
+       rel="noopener noreferrer">
+      <img src="assets/images/flyer-2.png" alt="Flyer" class="flyerPopup__img">
+    </a>
+  </div>
+</div>
+
+<style>
+.flyerPopup {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flyerPopup[hidden] {
+  display: none;
+}
+
+.flyerPopup__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.flyerPopup__content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90vh;
+}
+
+.flyerPopup__img {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto;
+}
+
+@media (min-width: 992px) {
+  .flyerPopup__content {
+    max-width: 680px;
+    max-height: 82vh;
+  }
+
+  .flyerPopup__img {
+    max-height: 82vh;
+  }
+}
+
+.flyerPopup__close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  color: #111827;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flyerPopup__close:hover {
+  background: #f3f4f6;
+}
+</style> 
+
+<script>
+document.addEventListener(\'DOMContentLoaded\', function () {
+  const flyerPopup = document.getElementById(\'flyerPopup\');
+  const flyerClose = flyerPopup.querySelector(\'.flyerPopup__close\');
+  const flyerBackdrop = flyerPopup.querySelector(\'.flyerPopup__backdrop\');
+
+  function closeFlyer() {
+    flyerPopup.setAttribute(\'hidden\', \'\');
+  }
+
+  flyerClose.addEventListener(\'click\', closeFlyer);
+  flyerBackdrop.addEventListener(\'click\', closeFlyer);
+});
+</script>
 <footer>
     <div class="container">
         <div class="row">
@@ -2641,7 +2911,11 @@ else {
                         <li class="nav-item"><a class="nav-link" href="index.php?id=4">FAQ</a></li>
                         <li class="nav-item"><a class="nav-link" href="index.php?id=5">Gallery</a></li>
                         <li class="nav-item"><a class="nav-link" href="index.php?id=3">Contact</a></li>
-                        <li class="nav-item"><a class="nav-link" href="index.php?id=6">My Account</a></li>
+     <li class="nav-item">
+    <a class="nav-link" href="index.php?id=6" style="white-space: nowrap;">
+        My Account
+    </a>
+</li>
 
                     </ul>
                 </div>
@@ -3052,7 +3326,11 @@ window.addEventListener("scroll", function () {
                         <li class="nav-item"><a class="nav-link" href="[[~4]]">FAQ</a></li>
                         <li class="nav-item"><a class="nav-link" href="[[~5]]">Gallery</a></li>
                         <li class="nav-item"><a class="nav-link" href="[[~3]]">Contact</a></li>
-                        <li class="nav-item"><a class="nav-link" href="[[~6]]">My Account</a></li>
+     <li class="nav-item">
+    <a class="nav-link" href="[[~6]]" style="white-space: nowrap;">
+        My Account
+    </a>
+</li>
 
                     </ul>
                 </div>
@@ -3131,7 +3409,11 @@ window.addEventListener("scroll", function () {
                         <li class="nav-item"><a class="nav-link" href="[[~4]]">FAQ</a></li>
                         <li class="nav-item"><a class="nav-link" href="[[~5]]">Gallery</a></li>
                         <li class="nav-item"><a class="nav-link" href="[[~3]]">Contact</a></li>
-                        <li class="nav-item"><a class="nav-link" href="[[~6]]">My Account</a></li>
+     <li class="nav-item">
+    <a class="nav-link" href="[[~6]]" style="white-space: nowrap;">
+        My Account
+    </a>
+</li>
 
                     </ul>
                 </div>

@@ -32,6 +32,10 @@ try {
             extra_services,
             total_price,
             total_price_final,
+            promo_code,
+            promo_discount,
+            shuttle_discount,
+            subtotal_before_discount,
             late_fee_percent,
             late_fee_amount,
             booking_type,
@@ -74,6 +78,9 @@ try {
                 $price = 500;
             }
 
+            if ((float)$booking['shuttle_discount'] > 0 && strpos($lowerItem, 'shuttle ') === 0) {
+                $price = 0;
+            }
             $extras[] = ['name' => $item, 'price' => $price];
             $extrasTotal += $price;
         }
@@ -110,6 +117,10 @@ try {
             'base_parking_cost' => $baseParkingCost,
             'extras' => $extras,
             'extras_total' => $extrasTotal,
+            'promo_code' => $booking['promo_code'],
+            'promo_discount' => (float)$booking['promo_discount'],
+            'shuttle_discount' => (float)$booking['shuttle_discount'],
+            'subtotal_before_discount' => $booking['subtotal_before_discount'] !== null ? (float)$booking['subtotal_before_discount'] : null,
             'late_fee_percent' => $lateFeePercent,
             'late_fee_amount' => $lateFeeAmount,
             'original_total' => $originalTotal,

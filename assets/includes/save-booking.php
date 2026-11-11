@@ -12,14 +12,15 @@ use Dompdf\Options;
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/db_connect.php';
+require_once __DIR__ . '/booking-pricing.php';
 
 try {
     $data = $_POST;
     $required = [
         'slot','vehicleType','hometown',
         'startDate','endDate','name',
-        'email','whatsapp','days','passenger_count',
-        'pricePerDay','totalPrice','vehicleNumber'
+        'email','whatsapp','passenger_count',
+        'vehicleNumber'
     ];
 
     function uploadImage($file, $uploadDir, $publicPath) {
@@ -54,6 +55,13 @@ try {
             throw new Exception("Missing field: {$field}");
         }
     }
+
+    // Recheck promotions and calculate the payable price on the server.
+    $pricing = \AirportBookingPricing\quote($conn, $data);
+    $data['days'] = $pricing['days'];
+    $data['pricePerDay'] = $pricing['price_per_day'];
+    $data['totalPrice'] = $pricing['total'];
+    $data['extras'] = array_values(array_unique($data['extras'] ?? []));
 
     // ===============================
     // BASE URL
@@ -123,6 +131,10 @@ try {
         days,
         price_per_day,
         total_price,
+        promo_code,
+        promo_discount,
+        shuttle_discount,
+        subtotal_before_discount,
         total_price_final,
         late_fee_percent,
         late_fee_amount,
@@ -156,6 +168,10 @@ try {
         :days,
         :ppd,
         :total,
+        :promoCode,
+        :promoDiscount,
+        :shuttleDiscount,
+        :subtotalBeforeDiscount,
         :totalFinal,
         :lateFeePercent,
         :lateFeeAmount,
@@ -196,6 +212,10 @@ try {
         ':days'         => $data['days'],
         ':ppd'          => $data['pricePerDay'],
         ':total'        => $data['totalPrice'],
+        ':promoCode'     => $pricing['promo_code'],
+        ':promoDiscount' => $pricing['promo_discount'],
+        ':shuttleDiscount' => $pricing['shuttle_discount'],
+        ':subtotalBeforeDiscount' => $pricing['subtotal'],
         ':extras'       => $extras,
         ':bookingType'  => $data['booking_type'] ?? 'website',
         ':createdBy'    => $_SESSION['user_id'] ?? 'system',  
@@ -320,6 +340,9 @@ try {
             </tr>";
         foreach ($data['extras'] as $extra) {
             $price = $extraPrices[$extra] ?? 0;
+            if ($pricing['shuttle_discount'] > 0 && strpos($extra, 'Shuttle ') === 0) {
+                $price = 'FREE (promo)';
+            }
             $html .= "
             <tr>
                 <td>{$extra}</td>
@@ -332,6 +355,14 @@ try {
     // ===============================
     // GRAND TOTAL
     // ===============================
+    if ($pricing['promo_code']) {
+        $safePromoCode = htmlspecialchars($pricing['promo_code'], ENT_QUOTES, 'UTF-8');
+        $promoDiscountFormatted = number_format($pricing['promo_discount'], 2);
+        $html .= "<p>Promo code: {$safePromoCode}<br>Parking discount: LKR {$promoDiscountFormatted}</p>";
+        if (!$pricing['shuttle_discount']) {
+            $html .= '<p>Free shuttle is only included when a shuttle option is selected and the promo includes free shuttle.</p>';
+        }
+    }
     $html .= "
     <div class='total-row'>
         <strong>Total: LKR {$grandTotalFormatted}</strong>
@@ -374,12 +405,13 @@ try {
     echo json_encode([
         'success'   => true,
         'reference' => $reference,
+        'pricing'   => $pricing,
         'pdf_url'   => $baseUrl . '/assets/invoices/' . $pdfFile
     ]);
 
 } catch (Throwable $e) {
     ob_clean();
-    http_response_code(500);
+    http_response_code($e instanceof InvalidArgumentException ? 422 : 500);
 
     echo json_encode([
         'success' => false,
