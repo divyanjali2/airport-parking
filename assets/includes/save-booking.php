@@ -23,9 +23,19 @@ try {
         'vehicleNumber'
     ];
 
-    function uploadImage($file, $uploadDir, $publicPath) {
-        if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
-            return null;
+    function uploadImage($file, $uploadDir, $publicPath, $label) {
+        $uploadError = $file['error'] ?? UPLOAD_ERR_NO_FILE;
+        if ($uploadError === UPLOAD_ERR_NO_FILE) {
+            throw new InvalidArgumentException("Please attach the {$label} image before booking.");
+        }
+        if ($uploadError === UPLOAD_ERR_INI_SIZE || $uploadError === UPLOAD_ERR_FORM_SIZE) {
+            throw new InvalidArgumentException("The {$label} image exceeds the server upload size limit. Please upload a smaller image.");
+        }
+        if ($uploadError === UPLOAD_ERR_PARTIAL) {
+            throw new InvalidArgumentException("The {$label} image was only partially uploaded. Please select the image again and retry.");
+        }
+        if ($uploadError !== UPLOAD_ERR_OK) {
+            throw new RuntimeException("The server could not receive the {$label} image. Please contact support if this continues.");
         }
 
         $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
@@ -33,7 +43,7 @@ try {
         $targetPath = $uploadDir . $filename;
 
         if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-            throw new Exception("Failed to upload file: " . $file['name']);
+            throw new RuntimeException("The server could not save the {$label} image. Please check that the uploads folder is writable.");
         }
 
         return $publicPath . $filename;
@@ -73,8 +83,8 @@ try {
     $uploadDir = __DIR__ . '/../../uploads/';
     $publicPath = $baseUrl . '/uploads/';
 
-    $airTicketUrl = uploadImage($_FILES['air_ticket_image_url'], $uploadDir, $publicPath);
-    $passportCopyUrl = uploadImage($_FILES['passport_copy_image_url'], $uploadDir, $publicPath);
+    $airTicketUrl = uploadImage($_FILES['air_ticket_image_url'] ?? null, $uploadDir, $publicPath, 'air ticket');
+    $passportCopyUrl = uploadImage($_FILES['passport_copy_image_url'] ?? null, $uploadDir, $publicPath, 'passport copy');
 
     // ===============================
     // GENERATE REFERENCE
