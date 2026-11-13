@@ -83,7 +83,7 @@ header {
 }
 
 .navbar .navbar-brand img {
-  width: 64%;
+  width: 20%;
   transition: all 0.3s ease;
 }
 .navbar .logo-white {
@@ -1397,9 +1397,22 @@ border-color: transparent;
 
 /* available */
 .outer-slot:not(.booked):not(:disabled) {
-    background: #011839  !important;
+    background: #177c23 !important;
     color: #fff;
     border-style: solid;
+    border-radius: 0 !important;
+    animation: redShineBlink 1.2s ease-in-out infinite !important;
+}
+
+@keyframes redShineBlink {
+    0%, 100% {
+        box-shadow: 0 0 0 transparent;
+    }
+    50% {
+        box-shadow:
+            0 0 7px 2px #177c23,
+            0 0 12px 3px #177c23;
+    }
 }
 
 /* booked */
@@ -1423,7 +1436,7 @@ border-color: transparent;
 
 .outer-slot:not(.booked):not(:disabled) {
   .icon-car {
-      color: white !important;
+      color: #e2e2e2 !important;
       font-weight: 900;
       font-size: 2rem;
   }
@@ -1432,9 +1445,9 @@ border-color: transparent;
 
 .extend-note {
   text-align: center;
-    background: #ffecec;
-    border-left: 5px solid #d93025;
-    color: #b71c1c;
+    background: #177c231a;
+    border-left: 5px solid #177c23;
+    color: #177c23;
     padding: 12px 14px;
     font-size: 14px;
     font-weight: 500;
